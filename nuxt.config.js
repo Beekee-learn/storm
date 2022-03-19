@@ -68,7 +68,7 @@ module.exports = {
 		middleware: 'middleware'
 	},
 	server: {
-		port: 3000,
+		port: 8086,
 		host: hote
 	},
 	render: {
