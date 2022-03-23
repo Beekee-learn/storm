@@ -10,7 +10,7 @@ export const state = () => ({
 	notification: '',
 	identifiant: '',
 	nom: '',
-	langue: 'fr',
+	langue: 'en',
 	langues: ['fr', 'es', 'en'],
 	statut: '',
 	interactions: []
@@ -47,13 +47,6 @@ export const actions = {
 	modifierUserAgent ({ commit }, userAgent) {
 		commit('modifierUserAgent', userAgent)
 	},
-	modifierUtilisateur ({ commit }, donnees) {
-		commit('modifierIdentifiant', donnees.identifiant)
-		commit('modifierNom', donnees.nom)
-		commit('modifierLangue', donnees.langue)
-		commit('modifierStatut', donnees.statut)
-		commit('modifierInteractions', donnees.interactions)
-	},
 	modifierMessage ({ commit }, message) {
 		commit('modifierMessage', message)
 	},
@@ -81,7 +74,7 @@ export const actions = {
 	reinitialiser ({ commit }) {
 		commit('modifierIdentifiant', '')
 		commit('modifierNom', '')
-		commit('modifierLangue', 'fr')
+		commit('modifierLangue', 'en')
 		commit('modifierStatut', '')
 	}
 }
