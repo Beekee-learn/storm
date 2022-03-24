@@ -115,7 +115,7 @@ app.get('/p/:code', function (req) {
 		const identifiant = 'u' + Math.random().toString(16).slice(3)
 		req.session.identifiant = identifiant
 		req.session.nom = ''
-		req.session.langue = 'fr'
+		req.session.langue = 'en'
 		req.session.statut = 'invite'
 		req.session.interactions = []
 		req.session.cookie.expires = new Date(Date.now() + (3600 * 24 * 7 * 1000))
@@ -132,16 +132,16 @@ app.post('/api/s-inscrire', function (req, res) {
 			const hash = bcrypt.hashSync(motdepasse, 10)
 			const date = moment().format()
 			const multi = db.multi()
-			multi.hmset('utilisateurs:' + identifiant, 'id', identifiant, 'motdepasse', hash, 'date', date, 'nom', '', 'langue', 'fr')
+			multi.hmset('utilisateurs:' + identifiant, 'id', identifiant, 'motdepasse', hash, 'date', date, 'nom', '', 'langue', 'en')
 			multi.exec(function () {
 				req.session.identifiant = identifiant
 				req.session.nom = ''
 				if (req.session.langue === '' || req.session.langue === undefined) {
-					req.session.langue = 'fr'
+					req.session.langue = 'en'
 				}
 				req.session.statut = 'utilisateur'
 				req.session.cookie.expires = new Date(Date.now() + (3600 * 24 * 7 * 1000))
-				res.json({ identifiant: identifiant, nom: '', langue: 'fr', statut: 'utilisateur' })
+				res.json({ identifiant: identifiant, nom: '', langue: 'en', statut: 'utilisateur' })
 			})
 		} else {
 			res.send('utilisateur_existe_deja')
@@ -291,7 +291,7 @@ app.post('/api/rejoindre-interaction', function (req, res) {
 				const identifiant = 'u' + Math.random().toString(16).slice(3)
 				req.session.identifiant = identifiant
 				req.session.nom = ''
-				req.session.langue = 'fr'
+				req.session.langue = 'en'
 				req.session.statut = 'invite'
 				req.session.interactions = []
 				req.session.cookie.expires = new Date(Date.now() + (3600 * 24 * 7 * 1000))
@@ -350,7 +350,7 @@ app.post('/api/creer-interaction-sans-compte', function (req, res) {
 				fs.mkdirsSync(chemin)
 				req.session.nom = ''
 				if (req.session.langue === '' || req.session.langue === undefined) {
-					req.session.langue = 'fr'
+					req.session.langue = 'en'
 				}
 				req.session.statut = 'auteur'
 				req.session.interactions.push({ code: code, motdepasse: motdepasse })
@@ -590,12 +590,12 @@ app.post('/api/se-connecter-interaction', function (req, res) {
 				if (motdepasse !== '' && motdepasse === resultat.motdepasse) {
 					req.session.nom = ''
 					if (req.session.langue === '' || req.session.langue === undefined) {
-						req.session.langue = 'fr'
+						req.session.langue = 'en'
 					}
 					req.session.statut = 'auteur'
 					req.session.cookie.expires = new Date(Date.now() + (3600 * 24 * 7 * 1000))
 					req.session.interactions.push({ code: code, motdepasse: motdepasse })
-					res.json({ code: code, identifiant: req.session.identifiant, nom: '', langue: 'fr', statut: 'auteur', interactions: req.session.interactions })
+					res.json({ code: code, identifiant: req.session.identifiant, nom: '', langue: 'en', statut: 'auteur', interactions: req.session.interactions })
 				} else {
 					res.send('non_autorise')
 				}
