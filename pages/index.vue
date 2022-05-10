@@ -1,7 +1,6 @@
 <template>
 	<div id="page">
 		<div id="accueil" :style="{'background': '#EAAD13'}">
-			<p>BONJOUR A TOUS</p>
 			<div id="langues">
 				<span class="bouton" role="button" tabindex="0" :class="{'selectionne': langue === 'fr'}" @click="modifierLangue('fr')">FR</span>
 				<span class="bouton" role="button" tabindex="0" :class="{'selectionne': langue === 'en'}" @click="modifierLangue('en')">EN</span>
