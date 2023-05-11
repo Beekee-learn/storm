@@ -59,6 +59,28 @@
 						<span class="coche" />
 					</label>
 				</div>
+				<div class="parametre" v-if="options.reponses === true && options.progression === 'libre'">
+					<h3>{{ $t('retroaction') }}</h3>
+					<label class="bouton-radio">{{ $t('oui') }}
+						<input type="radio" name="retroaction" :checked="options.retroaction === true" @change="modifierParametres('retroaction', true)">
+						<span class="coche" />
+					</label>
+					<label class="bouton-radio">{{ $t('non') }}
+						<input type="radio" name="retroaction" :checked="options.retroaction === false" @change="modifierParametres('retroaction', false)">
+						<span class="coche" />
+					</label>
+				</div>
+				<div class="parametre">
+					<h3>{{ $t('pointsPersonnalises') }}</h3>
+					<label class="bouton-radio">{{ $t('oui') }}
+						<input type="radio" name="pointsPersonnalises" :checked="options.pointsPersonnalises === true" @change="modifierParametres('pointsPersonnalises', true)">
+						<span class="coche" />
+					</label>
+					<label class="bouton-radio">{{ $t('non') }}
+						<input type="radio" name="pointsPersonnalises" :checked="options.pointsPersonnalises === false" @change="modifierParametres('pointsPersonnalises', false)">
+						<span class="coche" />
+					</label>
+				</div>
 				<div class="parametre" v-if="options.progression === 'animateur'">
 					<h3>{{ $t('vitesseCalculPoints') }}</h3>
 					<label class="bouton-radio">{{ $t('oui') }}
@@ -181,7 +203,28 @@
 								</draggable>
 
 								<span :id="'ajouter' + indexQ" class="ajouter" role="button" tabindex="0" :title="$t('ajouterReponse')" @click="ajouterItem(indexQ, 'Questionnaire')" v-if="q.items.length < 26"><i class="material-icons">add_circle_outline</i></span>
+							</div>
 
+							<div :id="'points' + indexQ" class="section" v-if="options.pointsPersonnalises === true">
+								<h2>{{ $t('points') }}</h2>
+								<input class="points" type="number" :value="q.points" @input="q.points = parseInt($event.target.value)">
+							</div>
+
+							<div :id="'retroaction' + indexQ" class="section" v-if="options.retroaction === true" :key="'retroaction_' + indexQ">
+								<h2>{{ $t('retroaction') }}</h2>
+								<div class="retroaction">
+									<label>{{ $t('retroactionCorrecte') }}</label>
+									<div class="conteneur-textarea">
+										<textarea-autosize v-model="q.retroaction.correcte" :rows="1" :min-height="46" :max-height="94" :placeholder="$t('retroactionCorrecte')" />
+									</div>
+									<label>{{ $t('retroactionIncorrecte') }}</label>
+									<div class="conteneur-textarea">
+										<textarea-autosize v-model="q.retroaction.incorrecte" :rows="1" :min-height="46" :max-height="94" :placeholder="$t('retroactionIncorrecte')" />
+									</div>
+								</div>
+							</div>
+
+							<div :id="'actions' + indexQ" class="section" :key="'actions_' + indexQ">
 								<span class="bouton supprimer" role="button" tabindex="0" @click="supprimerQuestion(indexQ)" v-if="questions.length > 1">{{ $t('supprimer') }}</span>
 								<span class="bouton dupliquer" role="button" tabindex="0" @click="dupliquerQuestion(indexQ)">{{ $t('dupliquer') }}</span>
 							</div>
@@ -308,6 +351,8 @@ export default {
 				progression: 'libre',
 				nom: 'facultatif',
 				reponses: true,
+				pointsPersonnalises: false,
+				retroaction: false,
 				classement: false,
 				points: 'classique',
 				modalite: 'synchrone'
@@ -317,7 +362,9 @@ export default {
 					question: '',
 					support: {},
 					option: 'choix-unique',
-					items: [{ texte: '', image: '', alt: '', reponse: false }, { texte: '', image: '', alt: '', reponse: false }]
+					items: [{ texte: '', image: '', alt: '', reponse: false }, { texte: '', image: '', alt: '', reponse: false }],
+					retroaction: { correcte: '', incorrecte: '' },
+					points: 1000
 				}
 			],
 			accordeonOuvert: 0,
@@ -348,6 +395,20 @@ export default {
 			if (!this.options.hasOwnProperty('points')) {
 				this.options.points = 'classique'
 			}
+			if (!this.options.hasOwnProperty('pointsPersonnalises')) {
+				this.options.pointsPersonnalises = false
+			}
+			if (!this.options.hasOwnProperty('retroaction')) {
+				this.options.retroaction = false
+			}
+			this.questions.forEach(function (question, index) {
+				if (!question.hasOwnProperty('retroaction')) {
+					this.questions[index].retroaction = { correcte: '', incorrecte: '' }
+				}
+				if (!question.hasOwnProperty('points')) {
+					this.questions[index].points = 1000
+				}
+			}.bind(this))
 		}
 	},
 	mounted () {

@@ -129,7 +129,12 @@ export default {
 	},
 	mounted () {
 		imagesLoaded('#question', function () {
-			this.verifierConteneur()
+			this.$nextTick(function () {
+				window.MathJax.typeset()
+				this.$nextTick(function () {
+					this.verifierConteneur()
+				}.bind(this))
+			}.bind(this))
 		}.bind(this))
 		window.addEventListener('resize', this.verifierConteneur, false)
 	},

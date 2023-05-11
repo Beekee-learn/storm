@@ -8,6 +8,15 @@ export default function (context) {
 		donnees.langue = context.req.session.langue
 		donnees.statut = context.req.session.statut
 		donnees.interactions = context.req.session.interactions
+		if (context.req.session.hasOwnProperty('filtre')) {
+			donnees.filtre = context.req.session.filtre
+		}
+		if (context.req.session.hasOwnProperty('email')) {
+			donnees.email = context.req.session.email
+		}
+		if (context.req.session.hasOwnProperty('digidrive')) {
+			donnees.digidrive = context.req.session.digidrive
+		}
 		context.store.dispatch('modifierUtilisateur', donnees)
 	}
 }

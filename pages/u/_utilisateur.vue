@@ -29,11 +29,11 @@
 						</div>
 						<div class="filtrer">
 							<span><i class="material-icons">sort</i></span>
-							<select id="champ-filtrer" @change="filtrer($event.target.value)">
-								<option value="date-desc" selected>{{ $t('dateDesc') }}</option>
-								<option value="date-asc">{{ $t('dateAsc') }}</option>
-								<option value="alpha-desc">{{ $t('alphaDesc') }}</option>
-								<option value="alpha-asc">{{ $t('alphaAsc') }}</option>
+							<select id="champ-filtrer" @change="modifierFiltre($event.target.value)">
+								<option value="date-desc" :selected="filtre === 'date-desc'">{{ $t('dateDesc') }}</option>
+								<option value="date-asc" :selected="filtre === 'date-asc'">{{ $t('dateAsc') }}</option>
+								<option value="alpha-desc" :selected="filtre === 'alpha-desc'">{{ $t('alphaDesc') }}</option>
+								<option value="alpha-asc" :selected="filtre === 'alpha-asc'">{{ $t('alphaAsc') }}</option>
 							</select>
 						</div>
 					</div>
@@ -90,13 +90,16 @@
 						<label>{{ $t('langue') }}</label>
 						<div class="langue">
 							<span role="button" tabindex="0" :class="{'selectionne': langue === 'fr'}" @click="modifierLangue('fr')">FR</span>
-							<span role="button" tabindex="0" :class="{'selectionne': langue === 'en'}" @click="modifierLangue('en')">EN</span>
 							<span role="button" tabindex="0" :class="{'selectionne': langue === 'es'}" @click="modifierLangue('es')">ES</span>
+							<span role="button" tabindex="0" :class="{'selectionne': langue === 'it'}" @click="modifierLangue('it')">IT</span>
+							<span role="button" tabindex="0" :class="{'selectionne': langue === 'en'}" @click="modifierLangue('en')">EN</span>
 						</div>
 						<label for="nom">{{ $t('nomOuPseudo') }}</label>
 						<input id="nom" type="text" :value="nom">
+						<label for="email">{{ $t('email') }}</label>
+						<input id="email" type="text" :value="email">
 						<div class="actions modifier">
-							<span class="bouton" role="button" tabindex="0" @click="modifierNom">{{ $t('enregistrer') }}</span>
+							<span class="bouton" role="button" tabindex="0" @click="modifierInformations">{{ $t('enregistrer') }}</span>
 						</div>
 						<label>{{ $t('motDePasse') }}</label>
 						<div class="actions modifier">
@@ -219,13 +222,23 @@ export default {
 		chargement
 	},
 	async asyncData (context) {
-		const { data } = await axios.post(context.store.state.hote + '/api/recuperer-donnees-utilisateur', {
+		const reponse = await axios.post(context.store.state.hote + '/api/recuperer-donnees-utilisateur', {
 			identifiant: context.store.state.identifiant
 		}, {
 			headers: { 'Content-Type': 'application/json' }
+		}).catch(function () {
+			return {
+				redirection: '/'
+			}
 		})
-		return {
-			interactions: data.interactions
+		if (!reponse || !reponse.hasOwnProperty('data')) {
+			return {
+				redirection: '/'
+			}
+		} else {
+			return {
+				interactions: reponse.data.interactions
+			}
 		}
 	},
 	data () {
@@ -241,7 +254,6 @@ export default {
 			confirmationNouveauMotDePasse: '',
 			requete: '',
 			resultats: [],
-			filtre: 'date-desc',
 			parametresImport: {
 				resultats: false
 			}
@@ -262,11 +274,17 @@ export default {
 		nom () {
 			return this.$store.state.nom
 		},
+		email () {
+			return this.$store.state.email
+		},
 		langue () {
 			return this.$store.state.langue
 		},
 		statutUtilisateur () {
 			return this.$store.state.statut
+		},
+		filtre () {
+			return this.$store.state.filtre
 		}
 	},
 	watch: {
@@ -276,12 +294,15 @@ export default {
 	},
 	watchQuery: ['page'],
 	created () {
+		if (this.redirection) {
+			this.$router.replace(this.redirection)
+		}
 		if (this.identifiant === '' || this.statutUtilisateur !== 'utilisateur') {
-			this.$router.push('/')
+			this.$router.replace('/')
 		}
 		this.$nuxt.$loading.start()
 		this.$i18n.setLocale(this.langue)
-		this.filtrer('date-desc')
+		this.filtrer(this.filtre)
 	},
 	mounted () {
 		setTimeout(function () {
@@ -429,7 +450,8 @@ export default {
 			this.chargement = true
 			axios.post(this.hote + '/api/exporter-interaction', {
 				code: this.code,
-				identifiant: this.identifiant
+				identifiant: this.identifiant,
+				admin: ''
 			}).then(function (reponse) {
 				this.chargement = false
 				const donnees = reponse.data
@@ -454,7 +476,8 @@ export default {
 			this.chargement = true
 			axios.post(this.hote + '/api/supprimer-interaction', {
 				identifiant: this.identifiant,
-				code: this.code
+				code: this.code,
+				admin: ''
 			}).then(function (reponse) {
 				const donnees = reponse.data
 				if (donnees === 'erreur') {
@@ -524,23 +547,50 @@ export default {
 			} else {
 				this.resultats = interactions
 			}
-			this.filtre = filtre
 		},
-		modifierNom () {
-			const nom = document.querySelector('#nom').value
-			if (nom !== '' && nom !== this.nom) {
+		modifierFiltre (filtre) {
+			if (this.filtre !== filtre) {
 				this.chargement = true
-				axios.post(this.hote + '/api/modifier-nom-utilisateur', {
+				axios.post(this.hote + '/api/modifier-filtre', {
 					identifiant: this.identifiant,
-					nom: nom
+					filtre: filtre
 				}).then(function (reponse) {
+					this.chargement = false
 					const donnees = reponse.data
 					if (donnees === 'non_connecte') {
-						this.$router.push('/')
+						this.$router.replace('/')
 					} else {
-						this.$store.dispatch('modifierNom', nom)
-						this.$store.dispatch('modifierNotification', this.$t('nomModifie'))
-						this.chargement = false
+						this.filtrer(filtre)
+						this.$store.dispatch('modifierFiltre', filtre)
+						this.$store.dispatch('modifierNotification', this.$t('filtreModifie'))
+					}
+				}.bind(this)).catch(function () {
+					this.chargement = false
+					this.$store.dispatch('modifierMessage', this.$t('erreurCommunicationServeur'))
+				}.bind(this))
+			}
+		},
+		modifierInformations () {
+			const nom = document.querySelector('#nom').value.trim()
+			const email = document.querySelector('#email').value.trim()
+			if ((nom !== '' && nom !== this.nom) || (email !== '' && email !== this.email)) {
+				if (email !== '' && this.$verifierEmail(email) === false) {
+					this.$store.dispatch('modifierMessage', this.$t('erreurEmail'))
+					return false
+				}
+				this.chargement = true
+				axios.post(this.hote + '/api/modifier-informations-utilisateur', {
+					identifiant: this.identifiant,
+					nom: nom,
+					email: email
+				}).then(function (reponse) {
+					this.chargement = false
+					const donnees = reponse.data
+					if (donnees === 'non_connecte') {
+						this.$router.replace('/')
+					} else {
+						this.$store.dispatch('modifierInformations', { nom: nom, email: email })
+						this.$store.dispatch('modifierNotification', this.$t('informationsModifiees'))
 					}
 				}.bind(this)).catch(function () {
 					this.chargement = false
@@ -566,7 +616,7 @@ export default {
 					const donnees = reponse.data
 					this.chargement = false
 					if (donnees === 'non_connecte') {
-						this.$router.push('/')
+						this.$router.replace('/')
 					} else if (donnees === 'motdepasse_incorrect') {
 						this.$store.dispatch('modifierMessage', this.$t('motDePasseActuelPasCorrect'))
 					} else if (donnees === 'erreur') {
@@ -598,7 +648,7 @@ export default {
 				}).then(function (reponse) {
 					const donnees = reponse.data
 					if (donnees === 'non_connecte') {
-						this.$router.push('/')
+						this.$router.replace('/')
 					} else {
 						this.$i18n.setLocale(langue)
 						document.getElementsByTagName('html')[0].setAttribute('lang', langue)
@@ -615,7 +665,8 @@ export default {
 		supprimerCompte () {
 			this.chargement = true
 			axios.post(this.hote + '/api/supprimer-compte', {
-				identifiant: this.identifiant
+				identifiant: this.identifiant,
+				admin: ''
 			}).then(function (reponse) {
 				const donnees = reponse.data
 				if (donnees === 'erreur') {
@@ -623,7 +674,7 @@ export default {
 					this.$store.dispatch('modifierMessage', this.$t('erreurCommunicationServeur'))
 				} else {
 					this.$store.dispatch('reinitialiser')
-					this.$router.push('/')
+					this.$router.replace('/')
 				}
 			}.bind(this)).catch(function () {
 				this.chargement = false
@@ -633,7 +684,7 @@ export default {
 		seDeconnecter () {
 			axios.post(this.hote + '/api/se-deconnecter').then(function () {
 				this.$store.dispatch('reinitialiser')
-				this.$router.push('/')
+				this.$router.replace('/')
 			}.bind(this)).catch(function () {
 				this.$store.dispatch('modifierMessage', this.$t('erreurCommunicationServeur'))
 			}.bind(this))
@@ -675,7 +726,7 @@ export default {
     font-size: 16px;
     font-weight: 700;
     text-transform: uppercase;
-	padding: 1em 1.5em;
+	padding: 0.75em 1em;
     border: 2px solid #00ced1;
 	border-radius: 2em;
 	margin-bottom: 15px;

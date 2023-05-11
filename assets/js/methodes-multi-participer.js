@@ -18,21 +18,14 @@ export default {
 		modifierIndexQuestion () {
 			this.$emit('index')
 		},
-		afficherMedia () {
-			this.modale = 'media'
+		afficherSupport () {
+			this.$emit('support')
 		},
 		fermerModale () {
 			this.modale = ''
 		},
 		afficherImage (event, image) {
-			event.preventDefault()
-			event.stopPropagation()
-			this.image = image
-			this.modale = 'image'
-		},
-		fermerModaleImage () {
-			this.modale = ''
-			this.image = ''
+			this.$emit('image', event, image)
 		}
 	}
 }

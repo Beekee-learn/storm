@@ -71,22 +71,22 @@ export default {
 		},
 		ajouterVideo () {
 			let id
+			let lien
 			// eslint-disable-next-line
-			let regExp = RegExp('<iframe(.+)</iframe>', 'g')
-			if (this.verifierURL(this.lien) === true) {
-				if (this.lien.includes('ladigitale.dev/digiplay/inc/video.php') && regExp.test(this.lien) === true) {
-					this.lien = this.lien.match(/<iframe [^>]*src="[^"]*"[^>]*>/g).map(x => x.replace(/.*src="([^"]*)".*/, '$1'))[0]
+			const regExpIframe = RegExp('<iframe(.+)</iframe>', 'g')
+			// eslint-disable-next-line
+			const regExpYT = /http(?:s?):\/\/(?:www\.)?youtu(?:be\.com\/watch\?v=|\.be\/)([\w\-\_]*)(&(amp;)?[\w\?=]*)?/
+			if (this.lien.includes('ladigitale.dev/digiview/inc/video.php') && regExpIframe.test(this.lien) === true) {
+				lien = this.lien.match(/<iframe [^>]*src="[^"]*"[^>]*>/g).map(x => x.replace(/.*src="([^"]*)".*/, '$1'))[0]
+				if (this.verifierURL(lien) === true) {
 					id = this.lien.match(/videoId=(.*?)&vignette/)[1]
-					this.support = { lien: this.lien, vignette: 'https://i.ytimg.com/vi/' + id + '/default.jpg', fichier: '', type: 'video' }
+					this.support = { lien: lien, vignette: 'https://i.ytimg.com/vi/' + id + '/default.jpg', fichier: '', type: 'video' }
 					this.fermerModaleAjouterMedia()
-				} else {
-					regExp = /^.*(youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/
-					if (this.lien.match(regExp)) {
-						id = this.lien.match(regExp)[2]
-						this.support = { lien: 'https://www.youtube-nocookie.com/embed/' + id, vignette: 'https://i.ytimg.com/vi/' + id + '/default.jpg', fichier: '', type: 'video' }
-						this.fermerModaleAjouterMedia()
-					}
 				}
+			} else if (this.verifierURL(this.lien) === true && regExpYT.test(this.lien) === true) {
+				id = this.lien.match(/^.*(youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/)[2]
+				this.support = { lien: 'https://www.youtube-nocookie.com/embed/' + id, vignette: 'https://i.ytimg.com/vi/' + id + '/default.jpg', fichier: '', type: 'video' }
+				this.fermerModaleAjouterMedia()
 			}
 		},
 		verifierURL (lien) {
@@ -153,7 +153,7 @@ export default {
 			if (interaction === 'Sondage') {
 				this.questions.push({ question: '', support: {}, option: 'choix-unique', items: [{ texte: '', image: '', alt: '' }, { texte: '', image: '', alt: '' }] })
 			} else if (interaction === 'Questionnaire') {
-				this.questions.push({ question: '', support: {}, option: 'choix-unique', items: [{ texte: '', image: '', alt: '', reponse: false }, { texte: '', image: '', alt: '', reponse: false }] })
+				this.questions.push({ question: '', support: {}, option: 'choix-unique', items: [{ texte: '', image: '', alt: '', reponse: false }, { texte: '', image: '', alt: '', reponse: false }], retroaction: { correcte: '', incorrecte: '' }, points: 1000 })
 			}
 			const indexQuestion = this.questions.length - 1
 			this.$nextTick(function () {
@@ -174,11 +174,11 @@ export default {
 		},
 		dupliquerQuestion (indexQuestion) {
 			const images = []
-			if (this.questions[indexQuestion].support.image !== '') {
+			if (this.questions[indexQuestion].support.image && this.questions[indexQuestion].support.image !== '') {
 				images.push(this.questions[indexQuestion].support.image)
 			}
 			this.questions[indexQuestion].items.forEach(function (item) {
-				if (item.image !== '') {
+				if (item.image && item.image !== '') {
 					images.push(item.image)
 				}
 			})

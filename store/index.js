@@ -1,4 +1,7 @@
 let hote = 'http://localhost:3000'
+if (process.env.PORT) {
+	hote = 'http://localhost:' + process.env.PORT
+}
 if (process.env.NODE_ENV === 'production') {
 	hote = process.env.DOMAIN
 }
@@ -10,10 +13,13 @@ export const state = () => ({
 	notification: '',
 	identifiant: '',
 	nom: '',
+	email: '',
 	langue: 'en',
-	langues: ['fr', 'es', 'en'],
+	langues: ['fr', 'es', 'it', 'en'],
 	statut: '',
-	interactions: []
+	interactions: [],
+	digidrive: [],
+	filtre: 'date-desc'
 })
 
 export const mutations = {
@@ -32,6 +38,9 @@ export const mutations = {
 	modifierNom (state, nom) {
 		state.nom = nom
 	},
+	modifierEmail (state, email) {
+		state.email = email
+	},
 	modifierLangue (state, langue) {
 		state.langue = langue
 	},
@@ -40,12 +49,36 @@ export const mutations = {
 	},
 	modifierInteractions (state, interactions) {
 		state.interactions = interactions
+	},
+	modifierDigidrive (state, digidrive) {
+		state.digidrive = digidrive
+	},
+	modifierFiltre (state, filtre) {
+		state.filtre = filtre
 	}
 }
 
 export const actions = {
 	modifierUserAgent ({ commit }, userAgent) {
 		commit('modifierUserAgent', userAgent)
+	},
+	modifierUtilisateur ({ commit }, donnees) {
+		commit('modifierIdentifiant', donnees.identifiant)
+		commit('modifierNom', donnees.nom)
+		commit('modifierLangue', donnees.langue)
+		commit('modifierStatut', donnees.statut)
+		if (donnees.hasOwnProperty('interactions')) {
+			commit('modifierInteractions', donnees.interactions)
+		}
+		if (donnees.hasOwnProperty('digidrive')) {
+			commit('modifierDigidrive', donnees.digidrive)
+		}
+		if (donnees.hasOwnProperty('filtre')) {
+			commit('modifierFiltre', donnees.filtre)
+		}
+		if (donnees.hasOwnProperty('email')) {
+			commit('modifierEmail', donnees.email)
+		}
 	},
 	modifierMessage ({ commit }, message) {
 		commit('modifierMessage', message)
@@ -59,22 +92,24 @@ export const actions = {
 	modifierNom ({ commit }, nom) {
 		commit('modifierNom', nom)
 	},
+	modifierInformations ({ commit }, donnees) {
+		commit('modifierNom', donnees.nom)
+		commit('modifierEmail', donnees.email)
+	},
 	modifierLangue ({ commit }, langue) {
 		commit('modifierLangue', langue)
 	},
-	modifierUtilisateur ({ commit }, donnees) {
-		commit('modifierIdentifiant', donnees.identifiant)
-		commit('modifierNom', donnees.nom)
-		commit('modifierLangue', donnees.langue)
-		commit('modifierStatut', donnees.statut)
-		if (donnees.hasOwnProperty('interactions')) {
-			commit('modifierInteractions', donnees.interactions)
-		}
+	modifierFiltre ({ commit }, filtre) {
+		commit('modifierFiltre', filtre)
 	},
 	reinitialiser ({ commit }) {
 		commit('modifierIdentifiant', '')
 		commit('modifierNom', '')
+		commit('modifierEmail', '')
 		commit('modifierLangue', 'en')
 		commit('modifierStatut', '')
+		commit('modifierFiltre', 'date-desc')
+		commit('modifierInteractions', [])
+		commit('modifierDigidrive', [])
 	}
 }

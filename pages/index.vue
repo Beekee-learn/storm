@@ -3,10 +3,10 @@
 		<div id="accueil" :style="{'background': '#EAAD13'}">
 			<div id="langues">
 				<span class="bouton" role="button" tabindex="0" :class="{'selectionne': langue === 'fr'}" @click="modifierLangue('fr')">FR</span>
-				<span class="bouton" role="button" tabindex="0" :class="{'selectionne': langue === 'en'}" @click="modifierLangue('en')">EN</span>
 				<span class="bouton" role="button" tabindex="0" :class="{'selectionne': langue === 'es'}" @click="modifierLangue('es')">ES</span>
+				<span class="bouton" role="button" tabindex="0" :class="{'selectionne': langue === 'it'}" @click="modifierLangue('it')">IT</span>
+				<span class="bouton" role="button" tabindex="0" :class="{'selectionne': langue === 'en'}" @click="modifierLangue('en')">EN</span>
 			</div>
-			<div id="masque" />
 			<div id="conteneur">
 				<div id="contenu">
 					<h1>
@@ -23,8 +23,7 @@
 					</div>
 				</div>
 				<div id="credits">
-					<p><a href="https://opencollective.com/ladigitale" target="_blank">{{ $t('soutien') }} ❤️.</a></p>
-					<p>{{ new Date().getFullYear() }} - <a href="https://ladigitale.dev" target="_blank" rel="noreferrer">La Digitale</a> - <a href="https://gitlab.com/ladigitale/digistorm" target="_blank" rel="noreferrer">Code source</a></p>
+					<p>La Digitale</p>
 				</div>
 			</div>
 		</div>
@@ -75,8 +74,8 @@
 			</div>
 		</div>
 
-		<div class="conteneur-modale" v-else-if="modale === 'se-connecter'">
-			<div id="se-connecter" class="modale">
+		<div class="conteneur-modale" v-else-if="modale === 'se-connecter' || modale === 'mot-de-passe-oublie'">
+			<div id="se-connecter" class="modale" v-if="modale === 'se-connecter'">
 				<header>
 					<span class="titre">{{ $t('seConnecter') }}</span>
 					<span class="fermer" role="button" tabindex="0" @click="fermerModaleSeConnecter"><i class="material-icons">close</i></span>
@@ -87,6 +86,7 @@
 						<input id="champ-identifiant" type="text" maxlength="48" :value="identifiant" @input="identifiant = $event.target.value" @keydown.enter="seConnecter">
 						<label for="champ-motdepasse">{{ $t('motDePasse') }}</label>
 						<input id="champ-motdepasse" type="password" maxlength="48" :value="motDePasse" @input="motDePasse = $event.target.value" @keydown.enter="seConnecter">
+						<div class="mot-de-passe-oublie" @click="ouvrirModaleMotDePasseOublie" v-html="$t('motDePasseOublie')" />
 						<div class="actions">
 							<span class="bouton" role="button" tabindex="0" @click="seConnecter" v-if="!chargementModale">{{ $t('valider') }}</span>
 							<div class="conteneur-chargement" v-else>
@@ -94,6 +94,26 @@
 							</div>
 						</div>
 						<p class="connexion" @click="ouvrirModaleSeConnecterInteraction">{{ $t('cliquezConnexionInteraction') }}</p>
+					</div>
+				</div>
+			</div>
+			<div class="modale" v-else-if="modale === 'mot-de-passe-oublie'">
+				<header>
+					<span class="titre">{{ $t('motDePasseOublie') }}</span>
+					<span class="fermer" @click="fermerModaleMotDePasseOublie"><i class="material-icons">close</i></span>
+				</header>
+				<div class="conteneur">
+					<div class="contenu">
+						<label for="champ-identifiant">{{ $t('identifiant') }}</label>
+						<input id="champ-identifiant" type="text" maxlength="48" :value="identifiant" @input="identifiant = $event.target.value">
+						<label for="champ-email">{{ $t('email') }}</label>
+						<input id="champ-email" type="text" :value="email" @input="email = $event.target.value" @keydown.enter="envoyerMotDePasse">
+						<div class="actions">
+							<span role="button" tabindex="0" class="bouton" @click="envoyerMotDePasse" v-if="!chargementModale">{{ $t('valider') }}</span>
+							<div class="conteneur-chargement" v-else>
+								<div class="chargement" />
+							</div>
+						</div>
 					</div>
 				</div>
 			</div>
@@ -134,6 +154,8 @@
 						<label for="champ-identifiant">{{ $t('identifiant') }}</label>
 						<p class="information">{{ $t('infoIdentifiant') }}</p>
 						<input id="champ-identifiant" type="text" maxlength="48" :value="identifiant" @input="identifiant = $event.target.value">
+						<label for="champ-email">{{ $t('email') }}</label>
+						<input id="champ-email" type="text" :value="email" @input="email = $event.target.value">
 						<label for="champ-motdepasse">{{ $t('motDePasse') }}</label>
 						<p class="information">{{ $t('infoMotDePasse') }}</p>
 						<input id="champ-motdepasse" type="password" maxlength="48" :value="motDePasse" @input="motDePasse = $event.target.value">
@@ -205,6 +227,7 @@ export default {
 			identifiant: '',
 			motDePasse: '',
 			confirmationMotDePasse: '',
+			email: '',
 			chargementModale: false,
 			hub: false
 		}
@@ -308,7 +331,7 @@ export default {
 					} else if (donnees === 'erreur') {
 						this.$store.dispatch('modifierMessage', this.$t('erreurCommunicationServeur'))
 					} else {
-						this.$router.push('/p/' + donnees.code)
+						this.$router.replace('/p/' + donnees.code)
 					}
 					this.fermerModaleParticiper()
 				}.bind(this)).catch(function () {
@@ -346,7 +369,7 @@ export default {
 						this.$store.dispatch('modifierMessage', this.$t('informationsConnexionIncorrectes'))
 					} else {
 						this.$store.dispatch('modifierUtilisateur', donnees)
-						this.$router.push('/u/' + donnees.identifiant)
+						this.$router.replace('/u/' + donnees.identifiant)
 					}
 				}.bind(this)).catch(function () {
 					this.chargementModale = false
@@ -369,11 +392,12 @@ export default {
 			this.confirmationMotDePasse = ''
 		},
 		sInscrire () {
-			if (this.identifiant.trim() !== '' && this.motDePasse.trim() !== '' && this.motDePasse.trim() === this.confirmationMotDePasse.trim()) {
+			if (this.identifiant.trim() !== '' && this.motDePasse.trim() !== '' && this.motDePasse.trim() === this.confirmationMotDePasse.trim() && this.email.trim() !== '' && this.$verifierEmail(this.email.trim()) === true) {
 				this.chargementModale = true
 				axios.post(this.hote + '/api/s-inscrire', {
 					identifiant: this.identifiant.trim(),
-					motdepasse: this.motDePasse.trim()
+					motdepasse: this.motDePasse.trim(),
+					email: this.email.trim()
 				}).then(function (reponse) {
 					this.chargementModale = false
 					const donnees = reponse.data
@@ -381,18 +405,18 @@ export default {
 						this.$store.dispatch('modifierMessage', this.$t('identifiantExisteDeja', { identifiant: this.identifiant.trim() }))
 					} else {
 						this.$store.dispatch('modifierUtilisateur', donnees)
-						this.$router.push('/u/' + donnees.identifiant)
+						this.$router.replace('/u/' + donnees.identifiant)
 					}
 				}.bind(this)).catch(function () {
 					this.chargementModale = false
 					this.$store.dispatch('modifierMessage', this.$t('erreurCommunicationServeur'))
 				}.bind(this))
-			} else {
-				if (this.identifiant.trim() === '' || this.motDePasse.trim() === '' || this.confirmationMotDePasse.trim() === '') {
-					this.$store.dispatch('modifierMessage', this.$t('remplirChamps'))
-				} else if (this.motDePasse.trim() !== this.confirmationMotDePasse.trim()) {
-					this.$store.dispatch('modifierMessage', this.$t('motsDePassePasIdentiques'))
-				}
+			} else if (this.identifiant.trim() === '' || this.motDePasse.trim() === '' || this.confirmationMotDePasse.trim() === '' || this.email.trim() === '') {
+				this.$store.dispatch('modifierMessage', this.$t('remplirChamps'))
+			} else if (this.motDePasse.trim() !== this.confirmationMotDePasse.trim()) {
+				this.$store.dispatch('modifierMessage', this.$t('motsDePassePasIdentiques'))
+			} else if (this.$verifierEmail(this.email.trim()) === false) {
+				this.$store.dispatch('modifierAlerte', this.$t('erreurEmail'))
 			}
 		},
 		ouvrirModaleSeConnecterInteraction () {
@@ -440,6 +464,49 @@ export default {
 				}
 			}
 		},
+		ouvrirModaleMotDePasseOublie () {
+			this.motDePasse = ''
+			this.code = ''
+			this.motdepasse = ''
+			this.modale = 'mot-de-passe-oublie'
+			this.$nextTick(function () {
+				document.querySelector('input').focus()
+			})
+		},
+		envoyerMotDePasse () {
+			if (this.identifiant.trim() !== '' && this.email.trim() !== '' && this.$verifierEmail(this.email.trim()) === true) {
+				this.chargementModale = true
+				axios.post(this.hote + '/api/mot-de-passe-oublie', {
+					identifiant: this.identifiant.trim(),
+					email: this.email.trim()
+				}).then(function (reponse) {
+					this.chargementModale = false
+					const donnees = reponse.data
+					if (donnees === 'erreur') {
+						this.$store.dispatch('modifierMessage', this.$t('erreurCommunicationServeur'))
+					} else if (donnees === 'identifiant_invalide') {
+						this.$store.dispatch('modifierMessage', this.$t('identifiantNonValide'))
+					} else if (donnees === 'email_invalide') {
+						this.$store.dispatch('modifierMessage', this.$t('emailNonValide'))
+					} else {
+						this.fermerModaleMotDePasseOublie()
+						this.$store.dispatch('modifierNotification', this.$t('emailEnvoye'))
+					}
+				}.bind(this)).catch(function () {
+					this.chargementModale = false
+					this.$store.dispatch('modifierMessage', this.$t('erreurCommunicationServeur'))
+				}.bind(this))
+			} else if (this.identifiant.trim() === '' || this.email.trim() === '') {
+				this.$store.dispatch('modifierMessage', this.$t('remplirChamps'))
+			} else if (this.$verifierEmail(this.email.trim()) === false) {
+				this.$store.dispatch('modifierMessage', this.$t('erreurEmail'))
+			}
+		},
+		fermerModaleMotDePasseOublie () {
+			this.modale = ''
+			this.identifiant = ''
+			this.email = ''
+		},
 		modifierLangue (langue) {
 			if (this.langue !== langue) {
 				this.chargement = true
@@ -474,10 +541,6 @@ export default {
 	height: 100%;
 }
 
-#accueil {
-
-}
-
 #langues {
 	position: fixed;
 	display: flex;
@@ -505,16 +568,6 @@ export default {
     color: #fff;
     border: 1px solid #222;
     cursor: default;
-}
-
-#masque {
-	position: absolute;
-	top: 0;
-	left: 0;
-	right: 0;
-	bottom: 0;
-	width: 100%;
-	height: 100%;
 }
 
 #conteneur {
@@ -568,18 +621,17 @@ export default {
     text-transform: uppercase;
 	padding: 1em 1.5em;
 	margin-right: 1em;
-    border: 2px solid white;
+    border: 2px solid #00ced1;
 	border-radius: 2em;
-    background: white;
+    background: #46fbff;
     cursor: pointer;
     transition: all ease-in 0.1s;
-    color:black;
 }
 
 #actions .bouton:hover {
 	text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.2);
 	background: grey;
-	color:black;
+	color: black;
 }
 
 #actions .bouton:last-child {
@@ -625,13 +677,14 @@ export default {
     left: 0;
     right: 0;
     bottom: 0;
-	z-index: 100000;
+	z-index: -1;
 }
 
 #hub.ouvert {
 	visibility: visible;
 	opacity: 1;
     animation: fonduEntrant linear 0.1s;
+	z-index: 100000;
 }
 
 #hub iframe {
@@ -660,6 +713,16 @@ export default {
 	text-align: center;
 	margin-top: 20px;
 	margin-bottom: 0;
+	cursor: pointer;
+}
+
+#se-connecter #champ-motdepasse {
+	margin-bottom: 10px;
+}
+
+.modale .contenu .mot-de-passe-oublie {
+	font-size: 12px;
+    margin-bottom: 20px;
 	cursor: pointer;
 }
 

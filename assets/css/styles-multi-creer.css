@@ -162,7 +162,6 @@
 .bouton.dupliquer {
 	color: #001d1d;
 	background: #00ced1;
-	margin-top: 15px;
 	text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.1);
 }
 
@@ -172,14 +171,13 @@
 	color: #fff;
 }
 
-.bouton.dupliquer {
+.bouton.supprimer + .bouton.dupliquer {
 	margin-left: 15px;
 }
 
 .bouton.supprimer {
 	color: #fff;
 	background: #ff6259;
-	margin-top: 15px;
 	text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.3);
 }
 
@@ -232,6 +230,19 @@
 
 #questionnaire .item .conteneur-textarea {
 	width: calc(100% - 112px);
+}
+
+#questionnaire .retroaction .conteneur-textarea {
+	margin-bottom: 15px;
+}
+
+#questionnaire .retroaction .conteneur-textarea:last-child {
+	margin-bottom: 0;
+}
+
+#questionnaire .retroaction label {
+	display: block;
+	margin-bottom: 5px;
 }
 
 .item .actions {

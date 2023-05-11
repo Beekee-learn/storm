@@ -65,36 +65,6 @@
 				</li>
 			</ul>
 		</div>
-
-		<div class="conteneur-modale" v-if="modale === 'media'">
-			<div id="modale-media" class="modale">
-				<div class="conteneur">
-					<div class="contenu">
-						<img v-if="media.type === 'image'" :src="media.fichier" :alt="$t('image')">
-						<audio v-else-if="media.type === 'audio'" controls :src="media.fichier" />
-						<div class="video" v-else-if="media.type === 'video'">
-							<iframe :src="media.lien" allowfullscreen />
-						</div>
-						<div class="actions">
-							<span class="bouton" role="button" tabindex="0" @click="fermerModaleMedia">{{ $t('fermer') }}</span>
-						</div>
-					</div>
-				</div>
-			</div>
-		</div>
-
-		<div class="conteneur-modale" v-else-if="modale === 'image'">
-			<div id="modale-image" class="modale">
-				<div class="conteneur">
-					<div class="contenu">
-						<img :src="image" :alt="$t('image')">
-						<div class="actions">
-							<span class="bouton" role="button" tabindex="0" @click="fermerModaleImage">{{ $t('fermer') }}</span>
-						</div>
-					</div>
-				</div>
-			</div>
-		</div>
 	</div>
 </template>
 
@@ -108,11 +78,6 @@ export default {
 		statut: String,
 		session: Number
 	},
-	sockets: {
-		reponseenvoyee: function () {
-			this.texte = ''
-		}
-	},
 	data () {
 		return {
 			question: '',
@@ -120,10 +85,7 @@ export default {
 			categories: [],
 			couleurs: ['#27ae60', '#2980b9', '#8e44ad', '#f39c12', '#d35400', '#b71540', '#535c68', '#273c75'],
 			categorie: '',
-			texte: '',
-			modale: '',
-			media: {},
-			image: ''
+			texte: ''
 		}
 	},
 	computed: {
@@ -147,6 +109,7 @@ export default {
 		}
 	},
 	created () {
+		this.ecouterSocket()
 		this.question = this.donnees.question
 		if (this.donnees.support.hasOwnProperty('image')) {
 			this.support = { fichier: this.donnees.support.image, alt: this.donnees.support.alt, type: 'image' }
@@ -165,8 +128,9 @@ export default {
 	methods: {
 		envoyerReponse () {
 			if (this.texte.trim() !== '') {
+				this.chargement = true
 				const id = Date.now().toString(36) + Math.random().toString(36).substr(2)
-				this.$emit('validation', { reponse: { id: id, texte: this.texte.trim(), categorie: this.categorie, visible: true }, identifiant: this.identifiant, nom: this.nom })
+				this.$socket.emit('reponse', { code: this.code, session: this.session, donnees: { reponse: { id: id, texte: this.texte.trim(), categorie: this.categorie, visible: true }, identifiant: this.identifiant, nom: this.nom } })
 				this.texte = ''
 			}
 		},
@@ -180,34 +144,22 @@ export default {
 			return couleur
 		},
 		afficherMedia (event, media, type) {
-			event.preventDefault()
-			event.stopPropagation()
-			if (type === 'video') {
-				this.media = { lien: media, type: type }
-			} else {
-				this.media = { fichier: media, type: type }
-			}
-			this.modale = 'media'
-		},
-		fermerModaleMedia () {
-			this.modale = ''
-			this.media = {}
+			this.$emit('media', event, media, type)
 		},
 		afficherImage (event, image) {
-			event.preventDefault()
-			event.stopPropagation()
-			this.image = image
-			this.modale = 'image'
-		},
-		fermerModaleImage () {
-			this.modale = ''
-			this.image = ''
+			this.$emit('image', event, image)
 		},
 		eclaircirCouleur (hex) {
 			const r = parseInt(hex.slice(1, 3), 16)
 			const v = parseInt(hex.slice(3, 5), 16)
 			const b = parseInt(hex.slice(5, 7), 16)
 			return 'rgba(' + r + ', ' + v + ', ' + b + ', ' + 0.1 + ')'
+		},
+		ecouterSocket () {
+			this.$socket.on('reponseenvoyee', function () {
+				this.chargement = false
+				this.texte = ''
+			}.bind(this))
 		}
 	}
 }

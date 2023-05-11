@@ -243,18 +243,23 @@
 }
 
 #questions .actions .reponse {
-	display: block;
+    display: block;
     font-size: 2rem;
     font-weight: 700;
     color: #00ced1;
 	line-height: 1;
+    text-align: center;
+    margin-top: 20px;
 }
 
-#questions .actions .reponse + .bouton {
+#questions .retroaction span {
+    display: block;
+    font-size: 2rem;
+    text-align: center;
+    margin-top: 20px;
+}
+
+#questions .actions .reponse + .bouton,
+#questions .retroaction + .actions {
 	margin-top: 40px;
-}
-
-#modale-media img,
-#modale-image img {
-	max-height: calc(90vh - 100px);
 }

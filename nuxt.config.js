@@ -2,6 +2,10 @@ let hote = 'localhost'
 if (process.env.NODE_ENV === 'production') {
 	hote = process.env.HOST
 }
+let port = 8086
+// if (process.env.PORT) {
+// 	port = process.env.PORT
+// }
 
 module.exports = {
 	head: {
@@ -12,7 +16,13 @@ module.exports = {
 			{ name: 'apple-mobile-web-app-capable', content: 'yes' },
 			{ name: 'mobile-web-app-capable', content: 'yes' },
 			{ name: 'HandheldFriendly', content: 'true' },
-			{ hid: 'description', name: 'description', content: 'Un outil éducatif pour interagir en temps réel en présence ou à distance proposé par La Digitale' }
+			{ name: 'description', content: 'Un outil éducatif pour interagir en temps réel en présence ou à distance proposé par La Digitale' },
+			{ property: 'og:title', content: 'Digistorm by La Digitale' },
+			{ property: 'og:description', content: 'Un outil éducatif pour interagir en temps réel en présence ou à distance proposé par La Digitale' },
+			{ property: 'og:type', content: 'website' },
+			{ property: 'og:url', content: 'https://digistorm.app/' },
+			{ property: 'og:image', content: 'https://digistorm.app/img/digistorm.png' },
+			{ property: 'og:locale', content: 'fr_FR' }
 		],
 		noscript: [
 			{ innerHTML: 'Vous devez activer Javascript sur votre navigateur pour utiliser cette application...' }
@@ -21,7 +31,8 @@ module.exports = {
 			lang: 'en'
 		},
 		script: [
-			{ src: '/js/qrcode.js' }
+			{ src: '/js/qrcode.js' },
+			{ src: '/js/charger-mathjax.js' }
 		],
 		link: [
 			{ rel: 'icon', type: 'image/png', href: '/favicon.png' }
@@ -33,7 +44,6 @@ module.exports = {
 		'@/assets/css/main.css'
 	],
 	plugins: [
-		{ src: '~/plugins/vue-socket-io', mode: 'client' },
 		{ src: '~/plugins/vue-textarea-autosize', mode: 'client' },
 		{ src: '~/plugins/vue-methods', mode: 'client' },
 		{ src: '~/plugins/vue-wordcloud', mode: 'client' }
@@ -54,6 +64,10 @@ module.exports = {
 			{
 				code: 'es',
 				file: 'es.js'
+			},
+			{
+				code: 'it',
+				file: 'it.js'
 			}
 		],
 		defaultLocale: 'en',
@@ -68,21 +82,24 @@ module.exports = {
 		middleware: 'middleware'
 	},
 	server: {
-		port: 8086,
+		port: port,
 		host: hote
 	},
 	render: {
 		csp: {
 			hashAlgorithm: 'sha256',
 			policies: {
-				'script-src': ["'self'", "'unsafe-inline'", "blob:"],
-				'frame-ancestors': ["'self'", 'https://ladigitale.dev', 'https://digipad.app'],
+				'script-src': ["'self'", "'unsafe-inline'", "blob:", 'https://cdn.jsdelivr.net'],
+				'frame-ancestors': ["*"],
 				
 			}
 		},
 		static: {
 			maxAge: 1000 * 60 * 60 * 24 * 7
 		}
+	},
+	env: {
+		adminPassword: process.env.ADMIN_PASSWORD
 	},
 	buildModules: [
 		'@nuxtjs/eslint-module'

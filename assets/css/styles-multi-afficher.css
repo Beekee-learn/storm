@@ -62,7 +62,7 @@
     position: relative;
     text-align: center;
     padding: 0;
-    outline: 0;
+    outline: none!important;
     border: 1px solid #fff;
 }
 
@@ -626,7 +626,7 @@
 	flex-wrap: wrap;
     width: calc(6rem + 15px);
     height: 100%;
-    font-size: 2rem;
+    font-size: 1.7rem;
     font-weight: 400;
 	padding-left: 15px;
 	margin-left: 15px;
@@ -651,6 +651,10 @@
 	border-radius: 1em;
 }
 
+#modale-question .items.resultats .item.correct .progression {
+	background: transparent;
+}
+
 #modale-question footer {
 	justify-content: space-between;
 }
@@ -665,7 +669,7 @@
 }
 
 #modale-liste .liste {
-	font-size: 16px;
+	font-size: 18px;
 }
 
 @keyframes vague {
