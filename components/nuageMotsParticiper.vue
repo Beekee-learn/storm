@@ -39,24 +39,7 @@
 			</ul>
 		</div>
 
-		<div class="conteneur-modale" v-if="modale === 'media'">
-			<div id="modale-media" class="modale">
-				<div class="conteneur">
-					<div class="contenu">
-						<img v-if="media.type === 'image'" :src="media.fichier" :alt="$t('image')">
-						<audio v-else-if="media.type === 'audio'" controls :src="media.fichier" />
-						<div class="video" v-else-if="media.type === 'video'">
-							<iframe :src="media.lien" allowfullscreen />
-						</div>
-						<div class="actions">
-							<span class="bouton" role="button" tabindex="0" @click="fermerModaleMedia">{{ $t('fermer') }}</span>
-						</div>
-					</div>
-				</div>
-			</div>
-		</div>
-
-		<div class="conteneur-modale" v-else-if="modale === 'nuage'">
+		<div class="conteneur-modale" v-if="modale === 'nuage'">
 			<div id="modale-nuage" class="modale">
 				<div class="conteneur">
 					<div class="contenu">
@@ -92,21 +75,6 @@ export default {
 		statut: String,
 		session: Number
 	},
-	sockets: {
-		reponseenvoyee: function () {
-			this.texte = ''
-		},
-		nuageaffiche: function () {
-			this.definirNuage()
-			this.modale = 'nuage'
-		},
-		nuagemasque: function () {
-			this.nuage = []
-			if (this.modale === 'nuage') {
-				this.modale = ''
-			}
-		}
-	},
 	data () {
 		return {
 			chargement: false,
@@ -116,7 +84,6 @@ export default {
 			texte: '',
 			nuage: [],
 			modale: '',
-			media: {},
 			progression: ''
 		}
 	},
@@ -142,9 +109,9 @@ export default {
 	},
 	watch: {
 		reponses: {
-			handler () {
+			handler (reponses) {
 				if (this.statut === 'nuage-affiche') {
-					this.definirNuage()
+					this.definirNuage(reponses)
 				}
 			},
 			deep: true
@@ -163,13 +130,14 @@ export default {
 		}
 	},
 	created () {
+		this.ecouterSocket()
 		this.question = this.donnees.question
 		this.support = this.donnees.support
 		if (this.donnees.hasOwnProperty('options')) {
 			this.options = this.donnees.options
 		}
 		if (this.statut === 'nuage-affiche') {
-			this.definirNuage()
+			this.definirNuage(this.reponses)
 		}
 	},
 	mounted () {
@@ -178,9 +146,9 @@ export default {
 		}
 	},
 	methods: {
-		definirNuage () {
+		definirNuage (reponses) {
 			const nuage = []
-			this.reponses.forEach(function (item) {
+			reponses.forEach(function (item) {
 				if (item.reponse.visible && (Object.keys(this.options).length === 0 || (this.options.hasOwnProperty('casse') && this.options.casse === 'non'))) {
 					if (nuage.map(mot => mot.text).includes(item.reponse.texte) === true) {
 						nuage.forEach(function (mot, indexMot) {
@@ -212,25 +180,33 @@ export default {
 		},
 		envoyerReponse () {
 			if (this.texte.trim() !== '') {
+				this.chargement = true
 				const couleurs = ['#ffd077', '#3bc4c7', '#3a9eea', '#ff4e69', '#461e47']
 				const couleur = couleurs[Math.floor(Math.random() * couleurs.length)]
-				this.$emit('validation', { reponse: { texte: this.texte.trim(), couleur: couleur, visible: true }, identifiant: this.identifiant, nom: this.nom })
+				this.$socket.emit('reponse', { code: this.code, session: this.session, donnees: { reponse: { texte: this.texte.trim(), couleur: couleur, visible: true }, identifiant: this.identifiant, nom: this.nom } })
 				this.texte = ''
 			}
 		},
 		afficherMedia (event, media, type) {
-			event.preventDefault()
-			event.stopPropagation()
-			if (type === 'video') {
-				this.media = { lien: media, type: type }
-			} else {
-				this.media = { fichier: media, type: type }
-			}
-			this.modale = 'media'
+			this.$emit('media', event, media, type)
 		},
-		fermerModaleMedia () {
-			this.modale = ''
-			this.media = {}
+		ecouterSocket () {
+			this.$socket.on('reponseenvoyee', function () {
+				this.chargement = false
+				this.texte = ''
+			}.bind(this))
+
+			this.$socket.on('nuageaffiche', function () {
+				this.definirNuage(this.reponses)
+				this.modale = 'nuage'
+			}.bind(this))
+
+			this.$socket.on('nuagemasque', function () {
+				this.nuage = []
+				if (this.modale === 'nuage') {
+					this.modale = ''
+				}
+			}.bind(this))
 		}
 	}
 }

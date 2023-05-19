@@ -6,16 +6,21 @@ const { Nuxt, Builder } = require('nuxt')
 const express = require('express')
 const app = express()
 const server = http.createServer(app)
+const axios = require('axios')
 const cors = require('cors')
 const io = require('socket.io')(server, { cookie: false })
 const redis = require('redis')
 const session = require('express-session')
 const RedisStore = require('connect-redis')(session)
 let db
+let db_port = 6379
+if (process.env.DB_PORT) {
+	db_port = process.env.DB_PORT
+}
 if (process.env.NODE_ENV === 'production') {
-	db = redis.createClient({ host: process.env.DB_HOST, port: 6379, password: process.env.DB_PWD })
+	db = redis.createClient({ host: process.env.DB_HOST, port: db_port, password: process.env.DB_PWD })
 } else {
-	db = redis.createClient()
+	db = redis.createClient({ port: db_port })
 }
 const bodyParser = require('body-parser')
 const helmet = require('helmet')
@@ -28,23 +33,24 @@ const extract = require('extract-zip')
 const moment = require('moment')
 const bcrypt = require('bcrypt')
 const cron = require('node-cron')
-let storeOptions, cookie
+const nodemailer = require('nodemailer')
+let storeOptions, cookie, dureeSession, domainesAutorises
 if (process.env.NODE_ENV === 'production') {
 	storeOptions = {
 		host: process.env.DB_HOST,
-		port: 6379,
+		port: db_port,
 		pass: process.env.DB_PWD,
 		client: db,
 		prefix: 'sessions:'
 	}
 	cookie = {
-//		sameSite: 'None',
-		secure: false
+		sameSite: 'None',
+		secure: true
 	}
 } else {
 	storeOptions = {
 		host: 'localhost',
-		port: 6379,
+		port: db_port,
 		client: db,
 		prefix: 'sessions:'
 	}
@@ -61,10 +67,28 @@ const sessionOptions = {
 	saveUninitialized: false,
 	cookie: cookie
 }
+if (process.env.SESSION_DURATION) {
+	dureeSession = parseInt(process.env.SESSION_DURATION)
+} else {
+	dureeSession = 864000000 //3600 * 24 * 10 * 1000
+}
+if (process.env.NODE_ENV === 'production' && process.env.AUTORIZED_DOMAINS) {
+	domainesAutorises = process.env.AUTORIZED_DOMAINS.split(',')
+} else {
+	domainesAutorises = '*'
+}
 const expressSession = session(sessionOptions)
 const sharedsession = require('express-socket.io-session')
+const transporter = nodemailer.createTransport({
+	host: process.env.EMAIL_HOST,
+	port: process.env.EMAIL_PORT,
+	secure: process.env.EMAIL_SECURE,
+	auth: {
+		user: process.env.EMAIL_ADDRESS,
+		pass: process.env.EMAIL_PASSWORD
+	}
+})
 const config = require('../nuxt.config.js')
-
 config.dev = !(process.env.NODE_ENV === 'production')
 const nuxt = new Nuxt(config)
 const { host, port } = nuxt.options.server
@@ -84,13 +108,13 @@ cron.schedule('59 23 * * Saturday', () => {
 const t = require(path.join(__dirname, '..', '/lang/lang.js'))
 
 app.set('trust proxy', true)
-app.use(helmet())
+app.use(helmet({ frameguard: false }))
 app.use(bodyParser.json({ limit: '10mb' }))
 app.use(expressSession)
 io.use(sharedsession(expressSession, {
 	autoSave: true
 }))
-app.use(cors())
+app.use(cors({ 'origin': domainesAutorises }))
 
 app.get('/', function (req, res) {
 	const identifiant = req.session.identifiant
@@ -115,10 +139,12 @@ app.get('/p/:code', function (req) {
 		const identifiant = 'u' + Math.random().toString(16).slice(3)
 		req.session.identifiant = identifiant
 		req.session.nom = ''
-		req.session.langue = 'en'
+		req.session.email = ''
+		req.session.langue = 'fr'
 		req.session.statut = 'invite'
 		req.session.interactions = []
-		req.session.cookie.expires = new Date(Date.now() + (3600 * 24 * 7 * 1000))
+		req.session.filtre = 'date-desc'
+		req.session.cookie.expires = new Date(Date.now() + dureeSession)
 	}
 	req.next()
 })
@@ -126,22 +152,25 @@ app.get('/p/:code', function (req) {
 app.post('/api/s-inscrire', function (req, res) {
 	const identifiant = req.body.identifiant
 	const motdepasse = req.body.motdepasse
-	db.exists('utilisateurs:' + identifiant, function (err, reponse) {
+	const email = req.body.email
+	db.exists('utilisateurs:' + identifiant, async function (err, reponse) {
 		if (err) { res.send('erreur') }
 		if (reponse === 0) {
-			const hash = bcrypt.hashSync(motdepasse, 10)
+			const hash = await bcrypt.hash(motdepasse, 10)
 			const date = moment().format()
 			const multi = db.multi()
-			multi.hmset('utilisateurs:' + identifiant, 'id', identifiant, 'motdepasse', hash, 'date', date, 'nom', '', 'langue', 'en')
+			multi.hmset('utilisateurs:' + identifiant, 'id', identifiant, 'email', email, 'motdepasse', hash, 'date', date, 'nom', '', 'langue', 'fr')
 			multi.exec(function () {
 				req.session.identifiant = identifiant
 				req.session.nom = ''
+				req.session.email = email
 				if (req.session.langue === '' || req.session.langue === undefined) {
-					req.session.langue = 'en'
+					req.session.langue = 'fr'
 				}
 				req.session.statut = 'utilisateur'
-				req.session.cookie.expires = new Date(Date.now() + (3600 * 24 * 7 * 1000))
-				res.json({ identifiant: identifiant, nom: '', langue: 'en', statut: 'utilisateur' })
+				req.session.cookie.expires = new Date(Date.now() + dureeSession)
+				req.session.filtre = 'date-desc'
+				res.json({ identifiant: identifiant, nom: '', email: email, langue: 'fr', statut: 'utilisateur' })
 			})
 		} else {
 			res.send('utilisateur_existe_deja')
@@ -154,18 +183,38 @@ app.post('/api/se-connecter', function (req, res) {
 	const motdepasse = req.body.motdepasse
 	db.exists('utilisateurs:' + identifiant, function (err, reponse) {
 		if (err) { res.send('erreur_connexion'); return false }
-		if (reponse === 1 && req.session.identifiant !== identifiant) {
-			db.hgetall('utilisateurs:' + identifiant, function (err, donnees) {
+		if (reponse === 1) {
+			db.hgetall('utilisateurs:' + identifiant, async function (err, donnees) {
 				if (err) { res.send('erreur_connexion'); return false }
-				if (bcrypt.compareSync(motdepasse, donnees.motdepasse)) {
+				const comparaison = await bcrypt.compare(motdepasse, donnees.motdepasse)
+				let comparaisonTemp = false
+				if (donnees.hasOwnProperty('motdepassetemp')) {
+					comparaisonTemp = await bcrypt.compare(motdepasse, donnees.motdepassetemp)
+				}
+				if (comparaison === true || comparaisonTemp === true) {
+					if (comparaisonTemp === true) {
+						const hash = await bcrypt.hash(motdepasse, 10)
+						db.hset('utilisateurs:' + identifiant, 'motdepasse', hash)
+						db.hdel('utilisateurs:' + identifiant, 'motdepassetemp')
+					}
 					const nom = donnees.nom
 					const langue = donnees.langue
 					req.session.identifiant = identifiant
 					req.session.nom = nom
 					req.session.langue = langue
 					req.session.statut = 'utilisateur'
-					req.session.cookie.expires = new Date(Date.now() + (3600 * 24 * 7 * 1000))
-					res.json({ identifiant: identifiant, nom: nom, langue: langue, statut: 'utilisateur' })
+					req.session.cookie.expires = new Date(Date.now() + dureeSession)
+					let filtre = 'date-desc'
+					if (donnees.hasOwnProperty('filtre')) {
+						filtre = donnees.filtre
+					}
+					req.session.filtre = filtre
+					let email = ''
+					if (donnees.hasOwnProperty('email')) {
+						email = donnees.email
+					}
+					req.session.email = email
+					res.json({ identifiant: identifiant, nom: nom, email: email, langue: langue, statut: 'utilisateur', filtre: filtre })
 				} else {
 					res.send('erreur_connexion')
 				}
@@ -176,12 +225,51 @@ app.post('/api/se-connecter', function (req, res) {
 	})
 })
 
+app.post('/api/mot-de-passe-oublie', function (req, res) {
+	const identifiant = req.body.identifiant
+	let email = req.body.email.trim()
+	db.exists('utilisateurs:' + identifiant, function (err, reponse) {
+		if (err) { res.send('erreur'); return false }
+		if (reponse === 1) {
+			db.hgetall('utilisateurs:' + identifiant, function (err, donnees) {
+				if ((donnees.hasOwnProperty('email') && donnees.email === email) || (verifierEmail(identifiant) === true)) {
+					if (!donnees.hasOwnProperty('email') || (donnees.hasOwnProperty('email') && donnees.email === '')) {
+						email = identifiant
+					}
+					const motdepasse = genererMotDePasse(7)
+					const message = {
+						from: '"La Digitale" <' + process.env.EMAIL_ADDRESS + '>',
+						to: '"Moi" <' + email + '>',
+						subject: 'Mot de passe Digistorm',
+						html: '<p>Votre nouveau mot de passe : ' + motdepasse + '</p>'
+					}
+					transporter.sendMail(message, async function (err) {
+						if (err) {
+							res.send('erreur')
+						} else {
+							const hash = await bcrypt.hash(motdepasse, 10)
+							db.hset('utilisateurs:' + identifiant, 'motdepassetemp', hash)
+							res.send('message_envoye')
+						}
+					})
+				} else {
+					res.send('email_invalide')
+				}
+			})
+		} else {
+			res.send('identifiant_invalide')
+		}
+	})
+})
+
 app.post('/api/se-deconnecter', function (req, res) {
 	req.session.identifiant = ''
 	req.session.nom = ''
+	req.session.email = ''
 	req.session.langue = ''
 	req.session.statut = ''
 	req.session.interactions = []
+	req.session.filtre = ''
 	req.session.destroy()
 	res.send('deconnecte')
 })
@@ -205,12 +293,26 @@ app.post('/api/modifier-nom', function (req, res) {
 	res.send('nom_modifie')
 })
 
-app.post('/api/modifier-nom-utilisateur', function (req, res) {
+app.post('/api/modifier-filtre', function (req, res) {
+	const identifiant = req.body.identifiant
+	if (req.session.identifiant && req.session.identifiant === identifiant) {
+		const filtre = req.body.filtre
+		db.hset('utilisateurs:' + identifiant, 'filtre', filtre)
+		req.session.filtre = filtre
+		res.send('filtre_modifie')
+	} else {
+		res.send('non_connecte')
+	}
+})
+
+app.post('/api/modifier-informations-utilisateur', function (req, res) {
 	const identifiant = req.body.identifiant
 	if (req.session.identifiant && req.session.identifiant === identifiant) {
 		const nom = req.body.nom
-		db.hmset('utilisateurs:' + identifiant, 'nom', nom)
+		const email = req.body.email
+		db.hmset('utilisateurs:' + identifiant, 'nom', nom, 'email', email)
 		req.session.nom = nom
+		req.session.email = email
 		res.send('utilisateur_modifie')
 	} else {
 		res.send('non_connecte')
@@ -220,11 +322,11 @@ app.post('/api/modifier-nom-utilisateur', function (req, res) {
 app.post('/api/modifier-mot-de-passe-utilisateur', function (req, res) {
 	const identifiant = req.body.identifiant
 	if (req.session.identifiant && req.session.identifiant === identifiant) {
-		db.hgetall('utilisateurs:' + identifiant, function (err, donnees) {
+		db.hgetall('utilisateurs:' + identifiant, async function (err, donnees) {
 			if (err) { res.send('erreur'); return false }
-			if (bcrypt.compareSync(req.body.motdepasse, donnees.motdepasse)) {
-				const hash = bcrypt.hashSync(req.body.nouveaumotdepasse, 10)
-				db.hmset('utilisateurs:' + identifiant, 'motdepasse', hash)
+			if (await bcrypt.compare(req.body.motdepasse, donnees.motdepasse)) {
+				const hash = await bcrypt.hash(req.body.nouveaumotdepasse, 10)
+				db.hset('utilisateurs:' + identifiant, 'motdepasse', hash)
 				res.send('motdepasse_modifie')
 			} else {
 				res.send('motdepasse_incorrect')
@@ -235,11 +337,95 @@ app.post('/api/modifier-mot-de-passe-utilisateur', function (req, res) {
 	}
 })
 
+app.post('/api/modifier-mot-de-passe-admin', function (req, res) {
+	const admin = req.body.admin
+	if (admin !== '' && admin === process.env.ADMIN_PASSWORD) {
+		const identifiant = req.body.identifiant
+		const email = req.body.email
+		if (identifiant !== '') {
+			db.exists('utilisateurs:' + identifiant, async function (err, resultat) {
+				if (err) { res.send('erreur'); return false }
+				if (resultat === 1) {
+					const hash = await bcrypt.hash(req.body.motdepasse, 10)
+					db.hset('utilisateurs:' + identifiant, 'motdepasse', hash)
+					res.send('motdepasse_modifie')
+				} else {
+					res.send('identifiant_non_valide')
+				}
+			})
+		} else if (email !== '') {
+			db.keys('utilisateurs:*', function (err, utilisateurs) {
+				if (utilisateurs !== null) {
+					const donneesUtilisateurs = []
+					utilisateurs.forEach(function (utilisateur) {
+						const donneesUtilisateur = new Promise(function (resolve) {
+							db.hgetall('utilisateurs:' + utilisateur.substring(13), function (err, donnees) {
+								if (err) { resolve({}) }
+								if (donnees.hasOwnProperty('email')) {
+									resolve({ identifiant: utilisateur.substring(13), email: donnees.email })
+								} else {
+									resolve({})
+								}
+							})
+						})
+						donneesUtilisateurs.push(donneesUtilisateur)
+					})
+					Promise.all(donneesUtilisateurs).then(async function (donnees) {
+						let utilisateurId = ''
+						donnees.forEach(function (utilisateur) {
+							if (utilisateur.hasOwnProperty('email') && utilisateur.email.toLowerCase() === email.toLowerCase()) {
+								utilisateurId = utilisateur.identifiant
+							}
+						})
+						if (utilisateurId !== '') {
+							const hash = await bcrypt.hash(req.body.motdepasse, 10)
+							db.hset('utilisateurs:' + utilisateurId, 'motdepasse', hash)
+							res.send(utilisateurId)
+						} else {
+							res.send('email_non_valide')
+						}
+					})
+				}
+			})
+		}
+	}
+})
+
+app.post('/api/recuperer-donnees-interaction-admin', function (req, res) {
+	const code = parseInt(req.body.code)
+	db.exists('interactions:' + code, async function (err, resultat) {
+		if (err) { res.send('erreur'); return false }
+		if (resultat === 1) {
+			db.hgetall('interactions:' + code, function (err, donneesInteraction) {
+				if (err) { res.send('erreur'); return false }
+				res.json(donneesInteraction)
+			})
+		} else {
+			res.send('interaction_inexistante')
+		}
+	})
+})
+
+app.post('/api/modifier-donnees-interaction-admin', function (req, res) {
+	const code = parseInt(req.body.code)
+	const champ = req.body.champ
+	const valeur = req.body.valeur
+	db.exists('interactions:' + code, async function (err, resultat) {
+		if (err) { res.send('erreur'); return false }
+		if (resultat === 1) {
+			db.hset('interactions:' + code, champ, valeur)
+			res.send('donnees_modifiees')
+		} else {
+			res.send('interaction_inexistante')
+		}
+	})
+})
+
 app.post('/api/modifier-langue-utilisateur', function (req, res) {
 	const identifiant = req.body.identifiant
 	if (req.session.identifiant && req.session.identifiant === identifiant) {
 		const langue = req.body.langue
-		db.hmset('utilisateurs:' + identifiant, 'langue', langue)
+		db.hset('utilisateurs:' + identifiant, 'langue', langue)
 		req.session.langue = langue
 		res.send('langue_modifiee')
 	} else {
@@ -249,7 +435,13 @@ app.post('/api/modifier-langue-utilisateur', function (req, res) {
 
 app.post('/api/supprimer-compte', function (req, res) {
 	const identifiant = req.body.identifiant
-	if (req.session.identifiant && req.session.identifiant === identifiant) {
+	const admin = req.body.admin
+	const motdepasseAdmin = process.env.ADMIN_PASSWORD
+	let type = 'utilisateur'
+	if ((req.session.identifiant && req.session.identifiant === identifiant) || (admin !== '' && admin === motdepasseAdmin)) {
+		if (admin === motdepasseAdmin) {
+			type === 'admin'
+		}
 		db.smembers('interactions-creees:' + identifiant, function (err, interactions) {
 			if (err) { res.send('erreur'); return false }
 			const donneesInteractions = []
@@ -267,13 +459,53 @@ app.post('/api/supprimer-compte', function (req, res) {
 				multi.del('interactions-creees:' + identifiant)
 				multi.del('utilisateurs:' + identifiant)
 				multi.exec(function () {
-					req.session.identifiant = ''
-					req.session.nom = ''
-					req.session.langue = ''
-					req.session.statut = ''
-					req.session.interactions = []
-					req.session.destroy()
-					res.send('compte_supprime')
+					if (type === 'utilisateur') {
+						req.session.identifiant = ''
+						req.session.nom = ''
+						req.session.email = ''
+						req.session.langue = ''
+						req.session.statut = ''
+						req.session.interactions = []
+						req.session.filtre = ''
+						req.session.destroy()
+						res.send('compte_supprime')
+					} else {
+						db.keys('sessions:*', function (err, sessions) {
+							if (sessions !== null) {
+								const donneesSessions = []
+								sessions.forEach(function (session) {
+									const donneesSession = new Promise(function (resolve) {
+										db.get('sessions:' + session.substring(9), function (err, donnees) {
+											if (err) { resolve({}) }
+											if (donnees !== null) {
+												donnees = JSON.parse(donnees)
+											} else {
+												resolve({})
+											}
+											if (donnees.hasOwnProperty('identifiant')) {
+												resolve({ session: session.substring(9), identifiant: donnees.identifiant })
+											} else {
+												resolve({})
+											}
+										})
+									})
+									donneesSessions.push(donneesSession)
+								})
+								Promise.all(donneesSessions).then(function (donnees) {
+									let sessionId = ''
+									donnees.forEach(function (item) {
+										if (item.hasOwnProperty('identifiant') && item.identifiant === identifiant) {
+											sessionId = item.session
+										}
+									})
+									if (sessionId !== '') {
+										db.del('sessions:' + sessionId)
+									}
+									res.send('compte_supprime')
+								})
+							}
+						})
+					}
 				})
 			})
 		})
@@ -291,10 +523,12 @@ app.post('/api/rejoindre-interaction', function (req, res) {
 				const identifiant = 'u' + Math.random().toString(16).slice(3)
 				req.session.identifiant = identifiant
 				req.session.nom = ''
-				req.session.langue = 'en'
+				req.session.email = ''
+				req.session.langue = 'fr'
 				req.session.statut = 'invite'
 				req.session.interactions = []
-				req.session.cookie.expires = new Date(Date.now() + (3600 * 24 * 7 * 1000))
+				req.session.filtre = 'date-desc'
+				req.session.cookie.expires = new Date(Date.now() + dureeSession)
 			}
 			res.json({ code: code, identifiant: req.session.identifiant })
 		} else {
@@ -308,7 +542,7 @@ app.post('/api/creer-interaction', function (req, res) {
 	if (req.session.identifiant && req.session.identifiant === identifiant) {
 		const titre = req.body.titre
 		const type = req.body.type
-		const code = Math.floor(100000 + Math.random() * 900000)
+		const code = Math.floor(1000000 + Math.random() * 9000000)
 		const date = moment().format()
 		db.exists('interactions:' + code, function (err, reponse) {
 			if (err) { res.send('erreur'); return false }
@@ -331,14 +565,14 @@ app.post('/api/creer-interaction', function (req, res) {
 })
 
 app.post('/api/creer-interaction-sans-compte', function (req, res) {
-	if (req.session.identifiant === '' || req.session.identifiant === undefined) {
+	if (req.session.identifiant === '' || req.session.identifiant === undefined || (req.session.identifiant.length !== 13 && req.session.identifiant.substring(0, 1) !== 'u')) {
 		const identifiant = 'u' + Math.random().toString(16).slice(3)
 		req.session.identifiant = identifiant
 		req.session.interactions = []
 	}
 	const titre = req.body.titre
 	const type = req.body.type
-	const code = Math.floor(100000 + Math.random() * 900000)
+	const code = Math.floor(1000000 + Math.random() * 9000000)
 	const motdepasse = creerMotDePasse()
 	const date = moment().format()
 	db.exists('interactions:' + code, function (err, reponse) {
@@ -349,12 +583,14 @@ app.post('/api/creer-interaction-sans-compte', function (req, res) {
 				const chemin = path.join(__dirname, '..', '/static/fichiers/' + code)
 				fs.mkdirsSync(chemin)
 				req.session.nom = ''
+				req.session.email = ''
 				if (req.session.langue === '' || req.session.langue === undefined) {
-					req.session.langue = 'en'
+					req.session.langue = 'fr'
 				}
 				req.session.statut = 'auteur'
 				req.session.interactions.push({ code: code, motdepasse: motdepasse })
-				req.session.cookie.expires = new Date(Date.now() + (3600 * 24 * 7 * 1000))
+				req.session.filtre = 'date-desc'
+				req.session.cookie.expires = new Date(Date.now() + dureeSession)
 				res.json({ code: code })
 			})
 		} else {
@@ -487,7 +723,7 @@ app.post('/api/modifier-statut-interaction', function (req, res) {
 						})
 					})
 				} else {
-					db.hmset('interactions:' + code, 'statut', statut, function (err) {
+					db.hset('interactions:' + code, 'statut', statut, function (err) {
 						if (err) { res.send('erreur'); return false }
 						res.send('statut_modifie')
 					})
@@ -513,7 +749,7 @@ app.post('/api/modifier-index-question', function (req, res) {
 					if (err) { res.send('erreur'); return false }
 					const donnees = JSON.parse(resultat.donnees)
 					donnees.indexQuestion = indexQuestion
-					db.hmset('interactions:' + code, 'donnees', JSON.stringify(donnees), function (err) {
+					db.hset('interactions:' + code, 'donnees', JSON.stringify(donnees), function (err) {
 						if (err) { res.send('erreur'); return false }
 						res.send('index_modifie')
 					})
@@ -578,6 +814,8 @@ app.post('/api/se-connecter-interaction', function (req, res) {
 	if (req.session.identifiant === '' || req.session.identifiant === undefined) {
 		const identifiant = 'u' + Math.random().toString(16).slice(3)
 		req.session.identifiant = identifiant
+	}
+	if (!req.session.hasOwnProperty('interactions')) {
 		req.session.interactions = []
 	}
 	const code = parseInt(req.body.code)
@@ -589,13 +827,15 @@ app.post('/api/se-connecter-interaction', function (req, res) {
 				if (err) { res.send('erreur'); return false }
 				if (motdepasse !== '' && motdepasse === resultat.motdepasse) {
 					req.session.nom = ''
+					req.session.email = ''
 					if (req.session.langue === '' || req.session.langue === undefined) {
-						req.session.langue = 'en'
+						req.session.langue = 'fr'
 					}
 					req.session.statut = 'auteur'
-					req.session.cookie.expires = new Date(Date.now() + (3600 * 24 * 7 * 1000))
+					req.session.cookie.expires = new Date(Date.now() + dureeSession)
 					req.session.interactions.push({ code: code, motdepasse: motdepasse })
-					res.json({ code: code, identifiant: req.session.identifiant, nom: '', langue: 'en', statut: 'auteur', interactions: req.session.interactions })
+					req.session.filtre = 'date-desc'
+					res.json({ code: code, identifiant: req.session.identifiant, nom: '', langue: 'fr', statut: 'auteur', interactions: req.session.interactions })
 				} else {
 					res.send('non_autorise')
 				}
@@ -634,6 +874,81 @@ app.post('/api/recuperer-donnees-interaction', function (req, res) {
 	})
 })
 
+app.post('/api/verifier-acces', function (req, res) {
+	const code = parseInt(req.body.code)
+	const identifiant = req.body.identifiant
+	const motdepasse = req.body.motdepasse
+	db.exists('interactions:' + code, function (err, reponse) {
+		if (err) { res.send('erreur'); return false }
+		if (reponse === 1) {
+			db.hgetall('interactions:' + code, function (err, donnees) {
+				if (err) { res.send('erreur'); return false }
+				if (donnees.hasOwnProperty('motdepasse') && motdepasse !== '' && motdepasse === donnees.motdepasse) {
+					req.session.identifiant = identifiant
+					req.session.nom = ''
+					req.session.email = ''
+					if (req.session.langue === '' || req.session.langue === undefined) {
+						req.session.langue = 'fr'
+					}
+					req.session.statut = 'auteur'
+					req.session.cookie.expires = new Date(Date.now() + dureeSession)
+					if (!req.session.hasOwnProperty('interactions')) {
+						req.session.interactions = []
+					}
+					req.session.interactions.push({ code: code, motdepasse: motdepasse })
+					if (!req.session.hasOwnProperty('digidrive')) {
+						req.session.digidrive = []
+					}
+					if (!req.session.digidrive.includes(code)) {
+						req.session.digidrive.push(code)
+					}
+					req.session.filtre = 'date-desc'
+					res.json({ message: 'interaction_debloquee', code: code, identifiant: identifiant, nom: '', langue: 'fr', statut: 'auteur', interactions: req.session.interactions, digidrive: req.session.digidrive })
+				} else if (identifiant === donnees.identifiant && donnees.hasOwnProperty('motdepasse') && donnees.motdepasse === '') {
+					db.exists('utilisateurs:' + identifiant, function (err, resultat) {
+						if (err) { res.send('erreur'); return false }
+						if (resultat === 1) {
+							db.hgetall('utilisateurs:' + identifiant, async function (err, utilisateur) {
+								if (err) { res.send('erreur'); return false }
+								if (await bcrypt.compare(motdepasse, utilisateur.motdepasse)) {
+									req.session.identifiant = identifiant
+									req.session.nom = ''
+									req.session.email = ''
+									if (req.session.langue === '' || req.session.langue === undefined) {
+										req.session.langue = 'fr'
+									}
+									req.session.statut = 'auteur'
+									req.session.cookie.expires = new Date(Date.now() + dureeSession)
+									if (!req.session.hasOwnProperty('interactions')) {
+										req.session.interactions = []
+									}
+									req.session.interactions.push({ code: code, motdepasse: motdepasse })
+									if (!req.session.hasOwnProperty('digidrive')) {
+										req.session.digidrive = []
+									}
+									if (!req.session.digidrive.includes(code)) {
+										req.session.digidrive.push(code)
+									}
+									req.session.filtre = 'date-desc'
+									res.json({ message: 'interaction_debloquee', code: code, identifiant: identifiant, nom: '', langue: 'fr', statut: 'auteur', interactions: req.session.interactions, digidrive: req.session.digidrive })
+								} else {
+									res.send('erreur')
+								}
+							})
+						} else {
+							res.send('erreur')
+						}
+					})	
+				} else {
+					res.send('erreur')
+				}
+			})
+		} else {
+			res.send('erreur')
+		}
+	})
+})
+
 app.post('/api/telecharger-informations-interaction', function (req, res) {
 	const identifiant = req.body.identifiant
 	if (req.session.identifiant && req.session.identifiant === identifiant) {
@@ -645,32 +960,36 @@ app.post('/api/telecharger-informations-interaction', function (req, res) {
 		const doc = new PDFDocument()
 		const fichier = code + '_' + Math.random().toString(36).substring(2, 12) + '.pdf'
 		const chemin = path.join(__dirname, '..', '/static/fichiers/' + code + '/' + fichier)
-		const flux = fs.createWriteStream(chemin)
-		doc.pipe(flux)
-		doc.fontSize(16)
-		if (type === 'Sondage') {
-			doc.font('Helvetica-Bold').text(t[req.session.langue].sondage + ' - ' + titre)
-		} else if (type === 'Questionnaire') {
-			doc.font('Helvetica-Bold').text(t[req.session.langue].questionnaire + ' - ' + titre)
-		} else if (type === 'Remue-méninges') {
-			doc.font('Helvetica-Bold').text(t[req.session.langue].remueMeninges + ' - ' + titre)
-		} else if (type === 'Nuage-de-mots') {
-			doc.font('Helvetica-Bold').text(t[req.session.langue].nuageDeMots + ' - ' + titre)
+		if (fs.existsSync(path.join(__dirname, '..', '/static/fichiers/' + code))) {
+			const flux = fs.createWriteStream(chemin)
+			doc.pipe(flux)
+			doc.fontSize(16)
+			if (type === 'Sondage') {
+				doc.font('Helvetica-Bold').text(t[req.session.langue].sondage + ' - ' + titre)
+			} else if (type === 'Questionnaire') {
+				doc.font('Helvetica-Bold').text(t[req.session.langue].questionnaire + ' - ' + titre)
+			} else if (type === 'Remue-méninges') {
+				doc.font('Helvetica-Bold').text(t[req.session.langue].remueMeninges + ' - ' + titre)
+			} else if (type === 'Nuage-de-mots') {
+				doc.font('Helvetica-Bold').text(t[req.session.langue].nuageDeMots + ' - ' + titre)
+			}
+			doc.moveDown()
+			doc.fontSize(12)
+			doc.font('Helvetica').text(t[req.session.langue].code + ' ' + code)
+			doc.moveDown()
+			doc.font('Helvetica').text(t[req.session.langue].lien + ' ' + domaine + '/p/' + code)
+			doc.moveDown()
+			doc.font('Helvetica').text(t[req.session.langue].lienAdmin + ' ' + domaine + '/c/' + code)
+			doc.moveDown()
+			doc.font('Helvetica').text(t[req.session.langue].motdepasse + ' ' + motdepasse)
+			doc.moveDown()
+			doc.end()
+			flux.on('finish', function () {
+				res.send(fichier)
+			})
+		} else {
+			res.send('erreur')
 		}
-		doc.moveDown()
-		doc.fontSize(12)
-		doc.font('Helvetica').text(t[req.session.langue].code + ' ' + code)
-		doc.moveDown()
-		doc.font('Helvetica').text(t[req.session.langue].lien + ' ' + domaine + '/p/' + code)
-		doc.moveDown()
-		doc.font('Helvetica').text(t[req.session.langue].lienAdmin + ' ' + domaine + '/c/' + code)
-		doc.moveDown()
-		doc.font('Helvetica').text(t[req.session.langue].motdepasse + ' ' + motdepasse)
-		doc.moveDown()
-		doc.end()
-		flux.on('finish', function () {
-			res.send(fichier)
-		})
 	} else {
 		res.send('non_autorise')
 	}
@@ -722,7 +1041,9 @@ app.post('/api/dupliquer-interaction', function (req, res) {
 
 app.post('/api/exporter-interaction', function (req, res) {
 	const identifiant = req.body.identifiant
-	if (req.session.identifiant && req.session.identifiant === identifiant) {
+	const admin = req.body.admin
+	const motdepasseAdmin = process.env.ADMIN_PASSWORD
+	if ((req.session.identifiant && req.session.identifiant === identifiant) || (admin !== '' && admin === motdepasseAdmin)) {
 		const code = parseInt(req.body.code)
 		db.exists('interactions:' + code, function (err, reponse) {
 			if (err) { res.send('erreur'); return false }
@@ -859,25 +1180,25 @@ app.post('/api/importer-interaction', function (req, res) {
 app.post('/api/supprimer-interaction', function (req, res) {
 	const code = parseInt(req.body.code)
 	const identifiant = req.body.identifiant
-	if (req.session.identifiant && req.session.identifiant === identifiant) {
+	const admin = req.body.admin
+	const motdepasseAdmin = process.env.ADMIN_PASSWORD
+	if ((req.session.identifiant && req.session.identifiant === identifiant) || (admin !== '' && admin === motdepasseAdmin)) {
+		let suppressionFichiers = true
+		if (req.body.hasOwnProperty('suppressionFichiers')) {
+			suppressionFichiers = req.body.suppressionFichiers
+		}
 		db.exists('interactions:' + code, function (err, reponse) {
 			if (err) { res.send('erreur'); return false }
 			if (reponse === 1) {
-				if (req.session.statut === 'auteur') {
-					db.del('interactions:' + code)
-					const chemin = path.join(__dirname, '..', '/static/fichiers/' + code)
-					fs.removeSync(chemin)
+				const multi = db.multi()
+				multi.del('interactions:' + code)
+				multi.srem('interactions-creees:' + identifiant, code)
+				multi.exec(function () {
+					if (suppressionFichiers === true) {
+						fs.removeSync(path.join(__dirname, '..', '/static/fichiers/' + code))
+					}
 					res.send('interaction_supprimee')
-				} else if (req.session.statut === 'utilisateur') {
-					const multi = db.multi()
-					multi.del('interactions:' + code)
-					multi.srem('interactions-creees:' + identifiant, code)
-					multi.exec(function () {
-						const chemin = path.join(__dirname, '..', '/static/fichiers/' + code)
-						fs.removeSync(chemin)
-						res.send('interaction_supprimee')
-					})
-				}
+				})
 			} else {
 				res.send('erreur_code')
 			}
@@ -1397,32 +1718,40 @@ app.post('/api/televerser-image', function (req, res) {
 	if (!identifiant) {
 		res.send('non_autorise')
 	} else {
-		televerser(req, res, function () {
+		televerser(req, res, function (err) {
+			if (err) { res.send('erreur'); return false }
 			const fichier = req.file
-			const alt = path.parse(fichier.originalname).name
-			const code = req.body.code
-			const chemin = path.join(__dirname, '..', '/static/fichiers/' + code + '/' + fichier.filename)
-			const extension = path.parse(fichier.filename).ext
-			if (extension.toLowerCase() === '.jpg' || extension.toLowerCase() === '.jpeg') {
-				sharp(chemin).withMetadata().rotate().jpeg().resize(1000, 1000, {
-					kernel: sharp.kernel.nearest,
-					fit: 'inside'
-				}).toBuffer((err, buffer) => {
-					if (err) { res.send('erreur'); return false }
-					fs.writeFile(chemin, buffer, function() {
-						res.json({ image: fichier.filename, alt: alt })
+			if (fichier.hasOwnProperty('filename')) {
+				let alt = path.parse(fichier.filename).name
+				if (fichier.hasOwnProperty('originalname')) {
+					alt = path.parse(fichier.originalname).name
+				}
+				const code = req.body.code
+				const chemin = path.join(__dirname, '..', '/static/fichiers/' + code + '/' + fichier.filename)
+				const extension = path.parse(fichier.filename).ext
+				if (extension.toLowerCase() === '.jpg' || extension.toLowerCase() === '.jpeg') {
+					sharp(chemin).withMetadata().rotate().jpeg().resize(1000, 1000, {
+						fit: sharp.fit.inside,
+						withoutEnlargement: true
+					}).toBuffer((err, buffer) => {
+						if (err) { res.send('erreur'); return false }
+						fs.writeFile(chemin, buffer, function() {
+							res.json({ image: fichier.filename, alt: alt })
+						})
 					})
-				})
+				} else {
+					sharp(chemin).withMetadata().resize(1000, 1000, {
+						fit: sharp.fit.inside,
+						withoutEnlargement: true
+					}).toBuffer((err, buffer) => {
+						if (err) { res.send('erreur'); return false }
+						fs.writeFile(chemin, buffer, function() {
+							res.json({ image: fichier.filename, alt: alt })
+						})
+					})
+				}
 			} else {
-				sharp(chemin).withMetadata().resize(1000, 1000, {
-					kernel: sharp.kernel.nearest,
-					fit: 'inside'
-				}).toBuffer((err, buffer) => {
-					if (err) { res.send('erreur'); return false }
-					fs.writeFile(chemin, buffer, function() {
-						res.json({ image: fichier.filename, alt: alt })
-					})
-				})
+				res.send('erreur')
 			}
 		})
 	}
@@ -1444,35 +1773,40 @@ app.post('/api/televerser-media', function (req, res) {
 	if (!identifiant) {
 		res.send('non_autorise')
 	} else {
-		televerser(req, res, function () {
+		televerser(req, res, function (err) {
+			if (err) { res.send('erreur'); return false }
 			const fichier = req.file
-			const info = path.parse(fichier.originalname)
-			const alt = info.name
-			const extension = info.ext.toLowerCase()
-			const code = req.body.code
-			const chemin = path.join(__dirname, '..', '/static/fichiers/' + code + '/' + fichier.filename)
-			if (extension === '.jpg' || extension === '.jpeg') {
-				sharp(chemin).withMetadata().rotate().jpeg().resize(1000, 1000, {
-					kernel: sharp.kernel.nearest,
-					fit: 'inside'
-				}).toBuffer((err, buffer) => {
-					if (err) { res.send('erreur'); return false }
-					fs.writeFile(chemin, buffer, function() {
-						res.json({ fichier: fichier.filename, alt: alt, type: 'image' })
+			if (fichier.hasOwnProperty('filename') && fichier.hasOwnProperty('originalname')) {
+				const info = path.parse(fichier.originalname)
+				const alt = info.name
+				const extension = info.ext.toLowerCase()
+				const code = req.body.code
+				const chemin = path.join(__dirname, '..', '/static/fichiers/' + code + '/' + fichier.filename)
+				if (extension === '.jpg' || extension === '.jpeg') {
+					sharp(chemin).withMetadata().rotate().jpeg().resize(1000, 1000, {
+						fit: sharp.fit.inside,
+						withoutEnlargement: true
+					}).toBuffer((err, buffer) => {
+						if (err) { res.send('erreur'); return false }
+						fs.writeFile(chemin, buffer, function() {
+							res.json({ fichier: fichier.filename, alt: alt, type: 'image' })
+						})
 					})
-				})
-			} else if (extension === '.png' || extension === '.gif') {
-				sharp(chemin).withMetadata().resize(1000, 1000, {
-					kernel: sharp.kernel.nearest,
-					fit: 'inside'
-				}).toBuffer((err, buffer) => {
-					if (err) { res.send('erreur'); return false }
-					fs.writeFile(chemin, buffer, function() {
-						res.json({ fichier: fichier.filename, alt: alt, type: 'image' })
+				} else if (extension === '.png' || extension === '.gif') {
+					sharp(chemin).withMetadata().resize(1000, 1000, {
+						fit: sharp.fit.inside,
+						withoutEnlargement: true
+					}).toBuffer((err, buffer) => {
+						if (err) { res.send('erreur'); return false }
+						fs.writeFile(chemin, buffer, function() {
+							res.json({ fichier: fichier.filename, alt: alt, type: 'image' })
+						})
 					})
-				})
+				} else {
+					res.json({ fichier: fichier.filename, alt: alt, type: 'audio' })
+				}
 			} else {
-				res.json({ fichier: fichier.filename, alt: alt, type: 'audio' })
+				res.send('erreur')
 			}
 		})
 	}
@@ -1487,29 +1821,190 @@ app.post('/api/supprimer-fichiers', function (req, res) {
 	res.send('fichiers_supprimes')
 })
 
+app.post('/api/ladigitale', function (req, res) {
+	const tokenApi = req.body.token
+	const domaine = req.headers.host
+	const lien = req.body.lien
+	const params = new URLSearchParams()
+	params.append('token', tokenApi)
+	params.append('domaine', domaine)
+	axios.post(lien, params).then(function (reponse) {
+		if (reponse.data === 'non_autorise' || reponse.data === 'erreur') {
+			res.send('erreur_token')
+		} else if (reponse.data === 'token_autorise' && req.body.action && req.body.action === 'creer') {
+			const titre = req.body.nom
+			const type = req.body.interaction
+			const code = Math.floor(100000 + Math.random() * 900000)
+			const motdepasse = req.body.motdepasse
+			const date = moment().format()
+			let langue = 'fr'
+			if (req.session.hasOwnProperty('langue') && req.session.langue !== '' && req.session.langue !== undefined) {
+				langue = req.session.langue
+			}
+			db.exists('interactions:' + code, function (err, reponse) {
+				if (err) { res.send('erreur'); return false }
+				if (reponse === 0) {
+					db.hmset('interactions:' + code, 'type', type, 'titre', titre, 'code', code, 'motdepasse', motdepasse, 'donnees', JSON.stringify({}), 'reponses', JSON.stringify({}), 'sessions', JSON.stringify({}), 'statut', '', 'session', 1, 'date', date, function (err) {
+						if (err) { res.send('erreur'); return false }
+						const chemin = path.join(__dirname, '..', '/static/fichiers/' + code)
+						fs.mkdirsSync(chemin)
+						res.send(code.toString())
+					})
+				} else {
+					res.send('erreur')
+				}
+			})
+		} else if (reponse.data === 'token_autorise' && req.body.action && req.body.action === 'modifier-titre') {
+			const code = req.body.id
+			const titre = req.body.titre
+			db.hmset('interactions:' + code, 'titre', titre, function (err) {
+				if (err) { res.send('erreur'); return false }
+				res.send('titre_modifie')
+			})
+		} else if (reponse.data === 'token_autorise' && req.body.action && req.body.action === 'ajouter') {
+			const identifiant = req.body.identifiant
+			const motdepasse = req.body.motdepasse
+			const code = parseInt(req.body.id)
+			db.exists('interactions:' + code, function (err, reponse) {
+				if (err) { res.send('erreur'); return false }
+				if (reponse === 1) {
+					db.hgetall('interactions:' + code, function (err, donnees) {
+						if (err) { res.send('erreur'); return false }
+						if (donnees.hasOwnProperty('motdepasse') && motdepasse === donnees.motdepasse) {
+							res.json({ titre: donnees.titre, identifiant: identifiant })
+						} else if (donnees.hasOwnProperty('motdepasse') && donnees.motdepasse === '') {
+							db.exists('utilisateurs:' + donnees.identifiant, function (err, resultat) {
+								if (err) { res.send('erreur'); return false }
+								if (resultat === 1) {
+									db.hgetall('utilisateurs:' + donnees.identifiant, async function (err, utilisateur) {
+										if (err) { res.send('erreur'); return false }
+										if (await bcrypt.compare(motdepasse, utilisateur.motdepasse)) {
+											res.json({ titre: donnees.titre, identifiant: donnees.identifiant })
+										} else {
+											res.send('non_autorise')
+										}
+									})
+								} else {
+									res.send('erreur')
+								}
+							})
+						} else {
+							res.send('non_autorise')
+						}
+					})
+				} else {
+					res.send('contenu_inexistant')
+				}
+			})
+		} else if (reponse.data === 'token_autorise' && req.body.action && req.body.action === 'supprimer') {
+			const identifiant = req.body.identifiant
+			const motdepasse = req.body.motdepasse
+			const code = parseInt(req.body.id)
+			db.exists('interactions:' + code, function (err, reponse) {
+				if (err) { res.send('erreur'); return false }
+				if (reponse === 1) {
+					db.hgetall('interactions:' + code, function (err, donnees) {
+						if (err) { res.send('erreur'); return false }
+						if (donnees.hasOwnProperty('motdepasse') && motdepasse === donnees.motdepasse) {
+							db.del('interactions:' + code)
+							fs.removeSync(path.join(__dirname, '..', '/static/fichiers/' + code))
+							res.send('contenu_supprime')
+						} else if (donnees.hasOwnProperty('motdepasse') && donnees.motdepasse === '') {
+							db.exists('utilisateurs:' + identifiant, function (err, resultat) {
+								if (err) { res.send('erreur'); return false }
+								if (resultat === 1) {
+									db.hgetall('utilisateurs:' + identifiant, async function (err, utilisateur) {
+										if (err) { res.send('erreur'); return false }
+										if (await bcrypt.compare(motdepasse, utilisateur.motdepasse)) {
+											const multi = db.multi()
+											multi.del('interactions:' + code)
+											multi.srem('interactions-creees:' + identifiant, code)
+											multi.exec(function () {
+												fs.removeSync(path.join(__dirname, '..', '/static/fichiers/' + code))
+												res.send('contenu_supprime')
+											})
+										} else {
+											res.send('non_autorise')
+										}
+									})
+								} else {
+									res.send('erreur')
+								}
+							})
+						} else {
+							res.send('non_autorise')
+						}
+					})
+				} else {
+					res.send('contenu_supprime')
+				}
+			})
+		} else {
+			res.send('erreur')
+		}
+	}).catch(function () {
+		res.send('erreur')
+	})
+})
+
 app.use(nuxt.render)
 
 server.listen(port, host)
 
 io.on('connection', function (socket) {
-	socket.on('connexion', function (donnees) {
+	socket.on('connexion', async function (donnees) {
 		const code = donnees.code
 		const identifiant = donnees.identifiant
 		const nom = donnees.nom
 		socket.join(code)
 		socket.identifiant = identifiant
 		socket.nom = nom
-		const clients = Object.keys(io.sockets.adapter.rooms[code].sockets)
-		const utilisateurs = []
-		for (let client of clients) {
-			client = io.sockets.connected[client]
-			utilisateurs.push({ identifiant: client.identifiant, nom: client.nom })
+		const clients = await io.in(code).fetchSockets()
+		let utilisateurs = []
+		for (let i = 0; i < clients.length; i++) {
+			utilisateurs.push({ identifiant: clients[i].identifiant, nom: clients[i].nom })
 		}
+		utilisateurs = utilisateurs.filter((valeur, index, self) =>
+			index === self.findIndex((t) => (
+				t.identifiant === valeur.identifiant && t.nom === valeur.nom
+			))
+		)
 		io.in(code).emit('connexion', utilisateurs)
 	})
 
 	socket.on('deconnexion', function (code) {
 		socket.to(code).emit('deconnexion', socket.handshake.session.identifiant)
+	})
+
+	socket.on('donnees', function (donnees) {
+		const code = donnees.code
+		const identifiant = donnees.identifiant
+		const nom = donnees.nom
+		db.exists('interactions:' + parseInt(code), function (err, reponse) {
+			if (err) { socket.emit('erreur'); return false }
+			if (reponse === 1) {
+				db.hgetall('interactions:' + parseInt(code), async function (err, resultat) {
+					if (err) { socket.emit('erreur'); return false }
+					socket.join(code)
+					socket.identifiant = identifiant
+					socket.nom = nom
+					socket.emit('donnees', { titre: resultat.titre, donnees: JSON.parse(resultat.donnees), reponses: JSON.parse(resultat.reponses), statut: resultat.statut, session: parseInt(resultat.session) })
+					const clients = await io.in(code).fetchSockets()
+					let utilisateurs = []
+					for (let i = 0; i < clients.length; i++) {
+						utilisateurs.push({ identifiant: clients[i].identifiant, nom: clients[i].nom })
+					}
+					utilisateurs = utilisateurs.filter((valeur, index, self) =>
+						index === self.findIndex((t) => (
+							t.identifiant === valeur.identifiant && t.nom === valeur.nom
+						))
+					)
+					io.in(code).emit('connexion', utilisateurs)
+				})
+			} else {
+				socket.emit('erreurcode')
+			}
+		})
 	})
 
 	socket.on('interactionouverte', function (donnees) {
@@ -1549,8 +2044,9 @@ io.on('connection', function (socket) {
 	})
 
 	socket.on('modifiernom', function (donnees) {
-		socket.handshake.session.nom = donnees.nom
 		socket.to(donnees.code).emit('modifiernom', donnees)
+		socket.handshake.session.nom = donnees.nom
+		socket.handshake.session.save()
 	})
 
 	socket.on('reponse', function (reponse) {
@@ -1571,6 +2067,9 @@ io.on('connection', function (socket) {
 							reponses[session].forEach(function (item) {
 								if (item.identifiant === reponse.donnees.identifiant) {
 									item.reponse = reponse.donnees.reponse
+									if (item.nom !== reponse.donnees.nom && reponse.donnees.nom !== '') {
+										item.nom = reponse.donnees.nom
+									}
 								}
 							})
 						} else {
@@ -1581,7 +2080,12 @@ io.on('connection', function (socket) {
 							reponses[session].forEach(function (item) {
 								if (item.identifiant === reponse.donnees.identifiant) {
 									item.reponse = reponse.donnees.reponse
-									item.score = reponse.donnees.score
+									if (reponse.donnees.hasOwnProperty('temps')) {
+										item.temps = reponse.donnees.temps
+									}
+									if (item.nom !== reponse.donnees.nom && reponse.donnees.nom !== '') {
+										item.nom = reponse.donnees.nom
+									}
 								}
 							})
 						} else {
@@ -1590,17 +2094,17 @@ io.on('connection', function (socket) {
 					} else if (type === 'Remue-méninges' || type === 'Nuage-de-mots') {
 						reponses[session].push(reponse.donnees)
 					}
-					db.hmset('interactions:' + code, 'reponses', JSON.stringify(reponses), function (err) {
+					db.hset('interactions:' + code, 'reponses', JSON.stringify(reponses), function (err) {
 						if (err) { socket.emit('erreur'); return false }
-						socket.to(code).emit('reponse', reponse)
+						socket.to(reponse.code).emit('reponse', reponse)
 						socket.emit('reponseenvoyee', reponse)
 						socket.emit('reponses', { code: reponse.code, session: reponse.session, reponses: reponses[session] })
-						socket.handshake.session.cookie.expires = new Date(Date.now() + (3600 * 24 * 7 * 1000))
+						socket.handshake.session.cookie.expires = new Date(Date.now() + dureeSession)
 						socket.handshake.session.save()
 					})
 				})
 			} else {
-				socket.emit('erreurcode'); return false
+				socket.emit('erreurcode')
 			}
 		})
 	})
@@ -1621,14 +2125,14 @@ io.on('connection', function (socket) {
 								item.reponse.visible = false
 							}
 						})
-						db.hmset('interactions:' + code, 'reponses', JSON.stringify(reponses), function (err) {
+						db.hset('interactions:' + code, 'reponses', JSON.stringify(reponses), function (err) {
 							if (err) { socket.emit('erreur'); return false }
-							io.in(code).emit('reponses', { code: donnees.code, session: donnees.session, reponses: reponses[session] })
+							io.in(donnees.code).emit('reponses', { code: donnees.code, session: donnees.session, reponses: reponses[session] })
 						})
 					}
 				})
 			} else {
-				socket.emit('erreurcode'); return false
+				socket.emit('erreurcode')
 			}
 		})
 	})
@@ -1644,16 +2148,16 @@ io.on('connection', function (socket) {
 					let reponses = JSON.parse(resultat.reponses)
 					if (reponses[session]) {
 						reponses[session] = donnees.reponses
-						db.hmset('interactions:' + code, 'reponses', JSON.stringify(reponses), function (err) {
+						db.hset('interactions:' + code, 'reponses', JSON.stringify(reponses), function (err) {
 							if (err) { socket.emit('erreur'); return false }
-							io.in(code).emit('reponses', { code: donnees.code, session: donnees.session, reponses: reponses[session] })
-							socket.handshake.session.cookie.expires = new Date(Date.now() + (3600 * 24 * 7 * 1000))
+							io.in(donnees.code).emit('reponses', { code: donnees.code, session: donnees.session, reponses: reponses[session] })
+							socket.handshake.session.cookie.expires = new Date(Date.now() + dureeSession)
 							socket.handshake.session.save()
 						})
 					}
 				})
 			} else {
-				socket.emit('erreurcode'); return false
+				socket.emit('erreurcode')
 			}
 		})
 	})
@@ -1675,16 +2179,16 @@ io.on('connection', function (socket) {
 								item.reponse.couleur = couleur
 							}
 						})
-						db.hmset('interactions:' + code, 'reponses', JSON.stringify(reponses), function (err) {
+						db.hset('interactions:' + code, 'reponses', JSON.stringify(reponses), function (err) {
 							if (err) { socket.emit('erreur'); return false }
-							io.in(code).emit('modifiercouleurmot', { code: donnees.code, session: donnees.session, mot: donnees.mot, couleur: donnees.couleur })
-							socket.handshake.session.cookie.expires = new Date(Date.now() + (3600 * 24 * 7 * 1000))
+							socket.to(donnees.code).emit('modifiercouleurmot', { code: donnees.code, session: donnees.session, mot: donnees.mot, couleur: donnees.couleur })
+							socket.handshake.session.cookie.expires = new Date(Date.now() + dureeSession)
 							socket.handshake.session.save()
 						})
 					}
 				})
 			} else {
-				socket.emit('erreurcode'); return false
+				socket.emit('erreurcode')
 			}
 		})
 	})
@@ -1705,14 +2209,14 @@ io.on('connection', function (socket) {
 								item.reponse.visible = false
 							}
 						})
-						db.hmset('interactions:' + code, 'reponses', JSON.stringify(reponses), function (err) {
+						db.hset('interactions:' + code, 'reponses', JSON.stringify(reponses), function (err) {
 							if (err) { socket.emit('erreur'); return false }
-							io.in(code).emit('reponses', { code: donnees.code, session: donnees.session, reponses: reponses[session] })
+							io.in(donnees.code).emit('reponses', { code: donnees.code, session: donnees.session, reponses: reponses[session] })
 						})
 					}
 				})
 			} else {
-				socket.emit('erreurcode'); return false
+				socket.emit('erreurcode')
 			}
 		})
 	})
@@ -1733,14 +2237,14 @@ io.on('connection', function (socket) {
 								item.reponse.visible = false
 							}
 						})
-						db.hmset('interactions:' + code, 'reponses', JSON.stringify(reponses), function (err) {
+						db.hset('interactions:' + code, 'reponses', JSON.stringify(reponses), function (err) {
 							if (err) { socket.emit('erreur'); return false }
-							io.in(code).emit('reponses', { code: donnees.code, session: donnees.session, reponses: reponses[session] })
+							socket.to(donnees.code).emit('reponses', { code: donnees.code, session: donnees.session, reponses: reponses[session] })
 						})
 					}
 				})
 			} else {
-				socket.emit('erreurcode'); return false
+				socket.emit('erreurcode')
 			}
 		})
 	})
@@ -1771,6 +2275,9 @@ function formaterDate (date, mot, langue) {
 			break
 		case 'es':
 			dateFormattee = mot + ' el ' + date
+			break
+		case 'it':
+			dateFormattee = mot + ' il ' + date
 			break
 	}
 	return dateFormattee
@@ -1888,6 +2395,43 @@ function definirReponses (reponses, indexQuestion) {
 		}
 	})
 	return total
+}
+
+function genererMotDePasse (longueur) {
+	function rand (max) {
+		return Math.floor(Math.random() * max)
+	}
+	function verifierMotDePasse (motdepasse, regex, caracteres) {
+		if (!regex.test(motdepasse)) {
+			const nouveauCaractere = caracteres.charAt(rand(caracteres.length))
+			const position = rand(motdepasse.length + 1)
+			motdepasse = motdepasse.slice(0, position) + nouveauCaractere + motdepasse.slice(position)
+		}
+		return motdepasse
+	}
+	let caracteres = '123456789abcdefghijklmnopqrstuvwxyz'
+	const caracteresSpeciaux = '!#$@*'
+	const specialRegex = /[!#\$@*]/
+	const majuscules = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+	const majusculesRegex = /[A-Z]/
+
+	caracteres = caracteres.split('')
+	let motdepasse = ''
+	let index
+
+	while (motdepasse.length < longueur) {
+		index = rand(caracteres.length)
+		motdepasse += caracteres[index]
+		caracteres.splice(index, 1)
+	}
+	motdepasse = verifierMotDePasse(motdepasse, specialRegex, caracteresSpeciaux)
+	motdepasse = verifierMotDePasse(motdepasse, majusculesRegex, majuscules)
+	return motdepasse  
+}
+
+function verifierEmail (email) {
+	const regexExp = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/gi
+	return regexExp.test(email)
 }
 
 const televerser = multer({

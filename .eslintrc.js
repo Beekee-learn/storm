@@ -31,6 +31,7 @@ module.exports = {
 			'error',
 			'tab'
 		],
+		'nuxt/no-globals-in-created': 'off',
 		'no-tabs': 0,
 		'no-console': 0
 	}

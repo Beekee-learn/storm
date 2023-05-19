@@ -1,8 +1,6 @@
 module.exports = {
-    apps: [{
-		name: 'Digistorm',
-		// exec_mode: 'cluster',
-        // instances: 'max',
-        script: 'npm -- start'
-	}]
+  apps: [{
+    name: 'Digistorm',
+    script: 'npm -- start'
+  }]
 }

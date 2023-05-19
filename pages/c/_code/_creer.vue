@@ -5,9 +5,12 @@
 				<div id="conteneur-header">
 					<a id="logo" :href="hote" />
 
-					<div id="titre" class="edition" :class="{'utilisateur': statutUtilisateur === 'utilisateur'}" @click="afficherModaleTitre">
+					<div id="titre" class="edition" :class="{'utilisateur': statutUtilisateur === 'utilisateur'}" @click="afficherModaleTitre" v-if="!digidrive">
 						<span class="titre">{{ titre }}</span>
 						<span class="modifier" role="button" tabindex="0" :title="$t('modifierTitre')"><i class="material-icons">edit</i></span>
+					</div>
+					<div id="titre" :class="{'utilisateur': statutUtilisateur === 'utilisateur'}" v-else>
+						<span class="titre">{{ titre }}</span>
 					</div>
 
 					<div id="parametres">
@@ -25,7 +28,7 @@
 							<span>{{ $t('codeParticipants') }}:</span>
 							<span class="information">{{ code }}</span>
 							<span id="copier" class="icone" role="button" tabindex="0" :title="$t('copierLien')"><i class="material-icons">content_copy</i></span>
-							<span id="afficher" class="icone" role="button" tabindex="0" :title="$t('afficherCodeQR')" @click="afficherModaleCodeQR"><i class="material-icons">qr_code</i></span>
+							<span id="afficher" class="icone" role="button" tabindex="0" :title="$t('afficherCodeQR')" @click="afficherCodeQR"><i class="material-icons">qr_code</i></span>
 						</div>
 						<div class="motdepasse" v-if="statutUtilisateur === 'auteur'">
 							<span>{{ $t('motDePasseAdministration') }}:</span>
@@ -68,9 +71,9 @@
 					<a id="logo" :href="hote" />
 
 					<div id="titre" :class="{'utilisateur': statutUtilisateur === 'utilisateur'}">
-						<span class="code" @click="afficherModaleLien">{{ code }}</span>
+						<span class="code" @click="afficherLien">{{ code }}</span>
 						<span id="copier" class="icone" role="button" tabindex="0" :title="$t('copierLien')"><i class="material-icons">content_copy</i></span>
-						<span id="afficher" class="icone" role="button" tabindex="0" :title="$t('afficherCodeQR')" @click="afficherModaleCodeQR"><i class="material-icons">qr_code</i></span>
+						<span id="afficher" class="icone" role="button" tabindex="0" :title="$t('afficherCodeQR')" @click="afficherCodeQR"><i class="material-icons">qr_code</i></span>
 					</div>
 
 					<div id="parametres">
@@ -84,7 +87,7 @@
 			<div id="conteneur" class="interaction-ouverte">
 				<sondageAfficher :code="code" :donnees="donnees" :reponses="reponsesSession" :statut="statut" :resultats="resultats" :utilisateurs="utilisateurs" :classement-resultats="classementResultats" :index-question="indexQuestion" @demarrer="demarrer" @index="modifierIndexQuestion" v-if="type === 'Sondage'" />
 
-				<questionnaireAfficher :code="code" :donnees="donnees" :reponses="reponsesSession" :statut="statut" :resultats="resultats" :utilisateurs="utilisateurs" :classement="classement" :index-question="indexQuestion" @demarrer="demarrer" @index="modifierIndexQuestion" @classement="afficherClassementCollectif" @tableau-resultats="modifierTableauResultats" v-else-if="type === 'Questionnaire'" />
+				<questionnaireAfficher :code="code" :donnees="donnees" :reponses="reponsesSession" :statut="statut" :resultats="resultats" :utilisateurs="utilisateurs" :classement="classement" :index-question="indexQuestion" :reponse-visible="reponseVisible" @demarrer="demarrer" @index="modifierIndexQuestion" @classement="afficherClassementCollectif" @tableau-resultats="modifierTableauResultats" v-else-if="type === 'Questionnaire'" />
 
 				<remueMeningesAfficher :code="code" :donnees="donnees" :reponses="reponsesSession" :statut="statut" :session="session" v-else-if="type === 'Remue-méninges'" />
 
@@ -96,8 +99,11 @@
 					<span class="utilisateurs" role="button" tabindex="0" :title="$t('afficherListeParticipants')" @click="afficherModaleUtilisateurs" v-if="(type === 'Sondage' || type === 'Questionnaire') && donnees.hasOwnProperty('options') && donnees.options.nom === 'obligatoire'">{{ utilisateursConnectes.length }} <i class="material-icons">people</i></span>
 					<span class="utilisateurs" v-else>{{ utilisateursConnectes.length }} <i class="material-icons">people</i></span>
 
-					<span class="bouton icone" role="button" tabindex="0" :title="$t('masquerResultats')" @click="masquerResultats" v-if="(type === 'Sondage' || (type === 'Questionnaire' && donnees.options.progression === 'animateur' && statut !== 'attente')) && resultats && !tableauResultats && indexQuestion > -1"><i class="material-icons">visibility</i></span>
-					<span class="bouton icone masque" role="button" tabindex="0" :title="$t('afficherResultats')" @click="afficherResultats" v-else-if="(type === 'Sondage' || type === 'Questionnaire' && donnees.options.progression === 'animateur') && !resultats && !tableauResultats && indexQuestion > -1"><i class="material-icons">visibility_off</i></span>
+					<span class="bouton icone" role="button" tabindex="0" :title="$t('afficherReponse')" @click="reponseVisible = !reponseVisible" v-if="type === 'Questionnaire' && donnees.options.progression === 'animateur' && statut === 'ouvert' && indexQuestion > -1 && !reponseVisible && !tableauResultats"><i class="material-icons">unpublished</i></span>
+					<span class="bouton icone affiche" role="button" tabindex="0" :title="$t('masquerReponse')" @click="reponseVisible = !reponseVisible" v-else-if="type === 'Questionnaire' && donnees.options.progression === 'animateur' && statut === 'ouvert' && indexQuestion > -1 && reponseVisible && !tableauResultats"><i class="material-icons">check_circle</i></span>
+
+					<span class="bouton icone masque" role="button" tabindex="0" :title="$t('afficherResultats')" @click="afficherResultats" v-if="(type === 'Sondage' || type === 'Questionnaire' && donnees.options.progression === 'animateur') && !resultats && !tableauResultats && indexQuestion > -1"><i class="material-icons">visibility_off</i></span>
+					<span class="bouton icone" role="button" tabindex="0" :title="$t('masquerResultats')" @click="masquerResultats" v-else-if="(type === 'Sondage' || (type === 'Questionnaire' && donnees.options.progression === 'animateur' && statut !== 'attente')) && resultats && !tableauResultats && indexQuestion > -1"><i class="material-icons">visibility</i></span>
 
 					<span class="bouton icone" role="button" tabindex="0" :title="$t('trierResultats')" @click="classerResultats(true)" v-if="type === 'Sondage' && resultats && !classementResultats && indexQuestion > -1"><i class="material-icons">equalizer</i></span>
 
@@ -161,8 +167,9 @@
 						<label>{{ $t('langue') }}</label>
 						<div class="langue">
 							<span role="button" tabindex="0" :class="{'selectionne': langue === 'fr'}" @click="modifierLangue('fr')">FR</span>
-							<span role="button" tabindex="0" :class="{'selectionne': langue === 'en'}" @click="modifierLangue('en')">EN</span>
 							<span role="button" tabindex="0" :class="{'selectionne': langue === 'es'}" @click="modifierLangue('es')">ES</span>
+							<span role="button" tabindex="0" :class="{'selectionne': langue === 'it'}" @click="modifierLangue('it')">IT</span>
+							<span role="button" tabindex="0" :class="{'selectionne': langue === 'en'}" @click="modifierLangue('en')">EN</span>
 						</div>
 						<label v-if="(statut === '' || statut === 'termine') && type === 'Sondage'">{{ $t('exporterSondage') }}</label>
 						<label v-else-if="(statut === '' || statut === 'termine') && type === 'Questionnaire'">{{ $t('exporterQuestionnaire') }}</label>
@@ -170,13 +177,13 @@
 						<label v-else-if="(statut === '' || statut === 'termine') && type === 'Nuage-de-mots'">{{ $t('exporterNuageDeMots') }}</label>
 						<p v-if="(statut === '' || statut === 'termine')">{{ $t('messageExport') }}</p>
 						<div class="actions" v-if="(statut === '' || statut === 'termine')">
-							<span class="bouton" role="button" tabindex="0" @click="exporter">{{ $t('exporter') }}</span>
+							<span class="bouton" :class="{'exporter': digidrive}" role="button" tabindex="0" @click="exporter">{{ $t('exporter') }}</span>
 						</div>
-						<label v-if="(statut === '' || statut === 'termine') && type === 'Sondage'">{{ $t('supprimerSondage') }}</label>
-						<label v-else-if="(statut === '' || statut === 'termine') && type === 'Questionnaire'">{{ $t('supprimerQuestionnaire') }}</label>
-						<label v-else-if="(statut === '' || statut === 'termine') && type === 'Remue-méninges'">{{ $t('supprimerRemueMeninges') }}</label>
-						<label v-else-if="(statut === '' || statut === 'termine') && type === 'Nuage-de-mots'">{{ $t('supprimerNuageDeMots') }}</label>
-						<div class="actions" v-if="(statut === '' || statut === 'termine')">
+						<label v-if="(statut === '' || statut === 'termine') && type === 'Sondage' && !digidrive">{{ $t('supprimerSondage') }}</label>
+						<label v-else-if="(statut === '' || statut === 'termine') && type === 'Questionnaire' && !digidrive">{{ $t('supprimerQuestionnaire') }}</label>
+						<label v-else-if="(statut === '' || statut === 'termine') && type === 'Remue-méninges' && !digidrive">{{ $t('supprimerRemueMeninges') }}</label>
+						<label v-else-if="(statut === '' || statut === 'termine') && type === 'Nuage-de-mots' && !digidrive">{{ $t('supprimerNuageDeMots') }}</label>
+						<div class="actions" v-if="(statut === '' || statut === 'termine') && !digidrive">
 							<span class="bouton supprimer" role="button" tabindex="0" @click="afficherModaleConfirmation('supprimer-interaction', '')">{{ $t('supprimer') }}</span>
 						</div>
 					</div>
@@ -217,7 +224,7 @@
 					<div class="contenu">
 						<div class="utilisateurs-connectes">
 							<template v-for="(utilisateur, indexUtilisateur) in utilisateurs">
-								<div class="utilisateur" v-if="utilisateur.connecte === true" :key="'utilisateur_' + indexUtilisateur">
+								<div class="utilisateur" v-if="utilisateur.connecte === true && utilisateur.nom !== ''" :key="'utilisateur_' + indexUtilisateur">
 									<span>{{ utilisateur.nom }}</span>
 								</div>
 							</template>
@@ -275,6 +282,20 @@
 			</div>
 		</div>
 
+		<div class="conteneur-modale" v-else-if="modale === 'code-qr'">
+			<div id="modale-codeqr" class="modale">
+				<header>
+					<span class="titre">{{ $t('codeQR') }}</span>
+					<span class="fermer" role="button" tabindex="0" @click="fermerModale"><i class="material-icons">close</i></span>
+				</header>
+				<div class="conteneur">
+					<div class="contenu">
+						<div id="qr" />
+					</div>
+				</div>
+			</div>
+		</div>
+
 		<div class="conteneur-modale" v-if="modaleConfirmation !== ''">
 			<div id="modale-confirmation" class="modale">
 				<div class="conteneur">
@@ -285,20 +306,6 @@
 							<span class="bouton" role="button" tabindex="0" @click="supprimerResultat" v-if="modaleConfirmation === 'supprimer-resultat'">{{ $t('oui') }}</span>
 							<span class="bouton" role="button" tabindex="0" @click="supprimer" v-if="modaleConfirmation === 'supprimer-interaction'">{{ $t('oui') }}</span>
 						</div>
-					</div>
-				</div>
-			</div>
-		</div>
-
-		<div class="conteneur-modale" v-show="modale === 'codeqr'">
-			<div id="modale-codeqr" class="modale">
-				<header>
-					<span class="titre">{{ $t('codeQR') }}</span>
-					<span class="fermer" role="button" tabindex="0" @click="fermerModale"><i class="material-icons">close</i></span>
-				</header>
-				<div class="conteneur">
-					<div class="contenu">
-						<div id="qr" />
 					</div>
 				</div>
 			</div>
@@ -360,89 +367,55 @@ export default {
 		remueMeningesAfficher,
 		nuageMotsAfficher
 	},
-	sockets: {
-		connexion: function (donnees) {
-			const utilisateurs = donnees.filter(function (utilisateur) {
-				return utilisateur.identifiant !== this.identifiant
-			}.bind(this))
-			utilisateurs.forEach(function (utilisateur) {
-				utilisateur.connecte = true
-			})
-			this.utilisateurs = utilisateurs
-		},
-		deconnexion: function (identifiant) {
-			const utilisateurs = this.utilisateurs
-			utilisateurs.forEach(function (utilisateur, index) {
-				if (utilisateur.identifiant === identifiant) {
-					utilisateurs.splice(index, 1, { identifiant: utilisateur.identifiant, nom: utilisateur.nom, connecte: false })
-				}
-			})
-			this.utilisateurs = utilisateurs
-		},
-		reponse: function (reponse) {
-			if (reponse.code === this.code && reponse.session === this.session) {
-				if (this.type === 'Sondage') {
-					if (this.reponsesSession.map(function (e) { return e.identifiant }).includes(reponse.donnees.identifiant) === true) {
-						this.reponsesSession.forEach(function (item) {
-							if (item.identifiant === reponse.donnees.identifiant) {
-								item.reponse = reponse.donnees.reponse
-							}
-						})
-					} else {
-						this.reponsesSession.push(reponse.donnees)
-					}
-				} else if (this.type === 'Questionnaire') {
-					if (this.reponsesSession.map(function (e) { return e.identifiant }).includes(reponse.donnees.identifiant) === true) {
-						this.reponsesSession.forEach(function (item) {
-							if (item.identifiant === reponse.donnees.identifiant) {
-								item.reponse = reponse.donnees.reponse
-								item.score = reponse.donnees.score
-							}
-						})
-					} else {
-						this.reponsesSession.push(reponse.donnees)
-					}
-				} else if (this.type === 'Remue-méninges' || this.type === 'Nuage-de-mots') {
-					this.reponsesSession.push(reponse.donnees)
-				}
-			}
-		},
-		reponses: function (donnees) {
-			if (donnees.code === this.code && donnees.session === this.session) {
-				this.reponsesSession = donnees.reponses
-			}
-		},
-		modifiernom: function (donnees) {
-			const utilisateurs = this.utilisateurs
-			utilisateurs.forEach(function (utilisateur, index) {
-				if (utilisateur.identifiant === donnees.identifiant) {
-					utilisateurs[index].nom = donnees.nom
-				}
-			})
-			this.utilisateurs = utilisateurs
-		}
-	},
 	async asyncData (context) {
 		const code = context.route.params.code
-		const { data } = await axios.post(context.store.state.hote + '/api/recuperer-donnees-interaction', {
+		const reponse = await axios.post(context.store.state.hote + '/api/recuperer-donnees-interaction', {
 			code: code
 		}, {
 			headers: { 'Content-Type': 'application/json' }
+		}).catch(function () {
+			return {
+				redirection: '/',
+				code: code,
+				type: '',
+				titre: '',
+				motdepasse: '',
+				reponses: {},
+				statut: ''
+			}
 		})
-		if (data === 'erreur') {
-			context.redirect('/')
+		if (!reponse || !reponse.hasOwnProperty('data')) {
+			return {
+				redirection: '/',
+				code: code,
+				type: '',
+				titre: '',
+				motdepasse: '',
+				reponses: {},
+				statut: ''
+			}
+		} else if (reponse.data && reponse.data === 'erreur') {
+			return {
+				redirection: '/',
+				code: code,
+				type: '',
+				titre: '',
+				motdepasse: '',
+				reponses: {},
+				statut: ''
+			}
 		} else {
 			return {
 				code: code,
-				type: data.type,
-				titre: data.titre,
-				motdepasse: data.motdepasse,
-				proprietaire: data.identifiant,
-				donnees: data.donnees,
-				reponses: data.reponses,
-				sessions: data.sessions,
-				statut: data.statut,
-				session: data.session
+				type: reponse.data.type,
+				titre: reponse.data.titre,
+				motdepasse: reponse.data.motdepasse,
+				proprietaire: reponse.data.identifiant,
+				donnees: reponse.data.donnees,
+				reponses: reponse.data.reponses,
+				sessions: reponse.data.sessions,
+				statut: reponse.data.statut,
+				session: reponse.data.session
 			}
 		}
 	},
@@ -456,6 +429,7 @@ export default {
 			resultats: true,
 			classementResultats: false,
 			tableauResultats: false,
+			reponseVisible: false,
 			reponsesSession: [],
 			largeur: 0,
 			modaleConfirmation: '',
@@ -494,25 +468,31 @@ export default {
 		interactions () {
 			return this.$store.state.interactions
 		},
+		digidrive () {
+			return this.statutUtilisateur === 'auteur' && this.$store.state.digidrive.includes(parseInt(this.code))
+		},
 		utilisateursConnectes () {
 			const utilisateurs = []
-			this.utilisateurs.forEach(function (utilisateur) {
-				if (utilisateur.connecte) {
-					utilisateurs.push(utilisateur)
-				}
-			})
+			if (this.type === 'Questionnaire' && this.donnees.hasOwnProperty('options') && this.donnees.options.hasOwnProperty('modalite') && this.donnees.options.modalite === 'asynchrone') {
+				this.reponsesSession.forEach(function (reponse) {
+					utilisateurs.push({ identifiant: reponse.identifiant, nom: reponse.nom })
+				})
+			} else {
+				this.utilisateurs.forEach(function (utilisateur) {
+					if (utilisateur.connecte) {
+						utilisateurs.push(utilisateur)
+					}
+				})
+			}
 			return utilisateurs
 		},
 		classement () {
 			const classement = []
 			if (this.type === 'Questionnaire') {
 				this.reponsesSession.forEach(function (item) {
-					let scoreTotal = 0
-					item.score.forEach(function (score) {
-						scoreTotal = scoreTotal + score
-					})
+					const scoreTotal = this.definirScore(item, this.donnees)
 					classement.push({ identifiant: item.identifiant, score: scoreTotal })
-				})
+				}.bind(this))
 				classement.forEach(function (utilisateur) {
 					this.utilisateurs.forEach(function (u) {
 						if (u.identifiant === utilisateur.identifiant) {
@@ -527,10 +507,33 @@ export default {
 			return classement
 		}
 	},
+	watch: {
+		indexQuestion: function () {
+			this.reponseVisible = false
+		}
+	},
 	watchQuery: ['page'],
-	created () {
+	async created () {
+		if (this.redirection) {
+			this.$router.replace(this.redirection)
+			return false
+		}
 		this.$nuxt.$loading.start()
-		if (this.reponses[this.session]) {
+		this.ecouterSocket()
+		const identifiant = this.$route.query.id
+		const motdepasse = this.$route.query.mdp
+		if (identifiant && identifiant !== '' && motdepasse && motdepasse !== '') {
+			const reponse = await axios.post(this.hote + '/api/verifier-acces', {
+				code: this.code,
+				identifiant: identifiant,
+				motdepasse: window.atob(motdepasse)
+			})
+			if (reponse.data.hasOwnProperty('message') && reponse.data.message === 'interaction_debloquee') {
+				this.$store.dispatch('modifierUtilisateur', { identifiant: reponse.data.identifiant, nom: reponse.data.nom, langue: reponse.data.langue, statut: reponse.data.statut, interactions: reponse.data.interactions, digidrive: reponse.data.digidrive })
+			}
+			window.history.replaceState({}, document.title, window.location.href.split('?')[0])
+		}
+		if (this.reponses && this.reponses[this.session]) {
 			this.reponsesSession = this.reponses[this.session]
 		}
 		if (this.type === 'Sondage' || this.type === 'Questionnaire') {
@@ -548,24 +551,24 @@ export default {
 			this.$socket.emit('connexion', { code: this.code, identifiant: this.identifiant, nom: this.nom })
 		}
 		if (this.motdepasse === '' && this.proprietaire !== this.identifiant) {
-			this.$router.push('/')
+			this.$router.replace('/')
 		}
 	},
 	mounted () {
-		if ((this.statutUtilisateur === 'auteur' && this.interactions.map(item => item.code).includes(parseInt(this.code))) || (this.statutUtilisateur === 'utilisateur' && this.proprietaire === this.identifiant)) {
+		if (!this.redirection && ((this.statutUtilisateur === 'auteur' && this.interactions.map(item => item.code).includes(parseInt(this.code))) || (this.statutUtilisateur === 'utilisateur' && this.proprietaire === this.identifiant))) {
 			setTimeout(function () {
 				this.$nuxt.$loading.finish()
 				this.initialiser()
 				document.getElementsByTagName('html')[0].setAttribute('lang', this.langue)
 			}.bind(this), 100)
-		} else {
+		} else if (!this.redirection) {
 			this.$nextTick(function () {
 				this.$nuxt.$loading.finish()
 				document.querySelector('#motdepasse').focus()
 				setTimeout(function () {
 					document.getElementsByTagName('html')[0].setAttribute('lang', this.langue)
 				}.bind(this), 100)
-			})
+			}.bind(this))
 		}
 	},
 	beforeDestroy () {
@@ -582,25 +585,30 @@ export default {
 			clipboard.on('success', function () {
 				this.$store.dispatch('modifierNotification', this.$t('lienCopie'))
 			}.bind(this))
-			// eslint-disable-next-line
-			this.codeqr = new QRCode('qr', {
-				text: lien,
-				width: 360,
-				height: 360,
-				colorDark: '#000000',
-				colorLight: '#ffffff',
-				// eslint-disable-next-line
-				correctLevel : QRCode.CorrectLevel.H
-			})
+
 			this.verifierLargeur()
 			this.domaine = window.location.href.split('/c/')[0]
+
 			window.addEventListener('resize', this.verifierLargeur, false)
 		},
-		afficherModaleLien () {
+		afficherLien () {
 			this.modale = 'lien'
 		},
-		afficherModaleCodeQR () {
-			this.modale = 'codeqr'
+		afficherCodeQR () {
+			this.modale = 'code-qr'
+			this.$nextTick(function () {
+				const lien = this.hote + '/p/' + this.code
+				// eslint-disable-next-line
+				this.codeqr = new QRCode('qr', {
+					text: lien,
+					width: 360,
+					height: 360,
+					colorDark: '#000000',
+					colorLight: '#ffffff',
+					// eslint-disable-next-line
+					correctLevel : QRCode.CorrectLevel.H
+				})
+			}.bind(this))
 		},
 		fermerModale () {
 			this.modale = ''
@@ -654,7 +662,9 @@ export default {
 			}).then(function (reponse) {
 				this.chargement = false
 				const donnees = reponse.data
-				if (donnees === 'non_autorise') {
+				if (donnees === 'erreur') {
+					this.$store.dispatch('modifierMessage', this.$t('erreurCommunicationServeur'))
+				} else if (donnees === 'non_autorise') {
 					this.$store.dispatch('modifierMessage', this.$t('actionNonAutorisee'))
 				} else {
 					const fichier = this.code + '.pdf'
@@ -950,6 +960,9 @@ export default {
 						this.$store.dispatch('modifierNotification', this.$t('questionnaireOuvert'))
 					}
 					this.$socket.emit('interactionouverte', { code: this.code, session: this.session, titre: this.titre, donnees: this.donnees, date: date })
+					this.$nextTick(function () {
+						window.MathJax.typeset()
+					})
 				}
 			}.bind(this)).catch(function () {
 				this.chargement = false
@@ -1000,20 +1013,13 @@ export default {
 		},
 		afficherResultats () {
 			this.resultats = true
-			this.$store.dispatch('modifierNotification', this.$t('resultatsAffiches'))
 		},
 		masquerResultats () {
 			this.resultats = false
 			this.classementResultats = false
-			this.$store.dispatch('modifierNotification', this.$t('resultatsMasques'))
 		},
 		classerResultats (bool) {
 			this.classementResultats = bool
-			if (bool === true) {
-				this.$store.dispatch('modifierNotification', this.$t('resultatsTries'))
-			} else {
-				this.$store.dispatch('modifierNotification', this.$t('resultatsNonTries'))
-			}
 		},
 		verrouiller () {
 			this.chargement = true
@@ -1233,7 +1239,8 @@ export default {
 			const utilisateurs = []
 			reponses.forEach(function (item) {
 				if (this.type === 'Questionnaire') {
-					utilisateurs.push({ identifiant: item.identifiant, nom: item.nom, reponse: item.reponse, score: item.score })
+					const score = this.definirScores(item, this.sessions[session].donnees)
+					utilisateurs.push({ identifiant: item.identifiant, nom: item.nom, reponse: item.reponse, score: score })
 				} else if (this.type === 'Sondage' && this.sessions[session].donnees.hasOwnProperty('question')) {
 					utilisateurs.push({ identifiant: item.identifiant, nom: item.nom, reponse: [item.reponse] })
 				} else if (this.type === 'Remue-méninges' || this.type === 'Nuage-de-mots') {
@@ -1280,12 +1287,12 @@ export default {
 					})
 				} else if (this.type === 'Questionnaire') {
 					utilisateurs.forEach(function (utilisateur, index) {
-						this.sessions[session].classement.forEach(function (u) {
-							if (u.identifiant === utilisateur.identifiant) {
-								utilisateurs[index].total = u.score
-							}
+						let score = 0
+						utilisateur.score.forEach(function (points) {
+							score = score + points
 						})
-					}.bind(this))
+						utilisateurs[index].total = score
+					})
 					texte += this.$t('identifiant') + ',' + this.$t('nom') + ',' + this.$t('scoreTotal') + ','
 					for (let i = 0; i < totalQuestions; i++) {
 						if (i < (totalQuestions - 1)) {
@@ -1458,12 +1465,115 @@ export default {
 		verifierLargeur () {
 			this.largeur = window.innerWidth
 		},
+		definirScore (item, donnees) {
+			let scoreTotal = 0
+			if (item.hasOwnProperty('score') && donnees.options.points !== 'classique') {
+				item.score.forEach(function (score) {
+					scoreTotal = scoreTotal + score
+				})
+			} else {
+				donnees.questions.forEach(function (question, indexQuestion) {
+					const reponseCorrecte = []
+					question.items.forEach(function (i) {
+						if (i.reponse === true && i.texte !== '') {
+							reponseCorrecte.push(i.texte)
+						} else if (i.reponse === true && i.image !== '') {
+							reponseCorrecte.push(i.image)
+						}
+					})
+					const bonnesReponses = []
+					const mauvaisesReponses = []
+					question.items.forEach(function (i) {
+						if (i.reponse === true && (item.reponse[indexQuestion].includes(i.texte) || item.reponse[indexQuestion].includes(i.image))) {
+							bonnesReponses.push(i)
+						} else if (i.reponse === false && (item.reponse[indexQuestion].includes(i.texte) || item.reponse[indexQuestion].includes(i.image))) {
+							mauvaisesReponses.push(i)
+						}
+					})
+					let multiplicateurSecondes = 10
+					if (donnees.options.hasOwnProperty('multiplicateur') && donnees.options.multiplicateur > 0) {
+						multiplicateurSecondes = donnees.options.multiplicateur
+					}
+					if (((question.option === 'choix-unique' && bonnesReponses.length > 0) || (question.option === 'choix-multiples' && reponseCorrecte.every(i => item.reponse[indexQuestion].includes(i)) === true && mauvaisesReponses.length === 0)) && donnees.options.points === 'classique' && question.hasOwnProperty('points')) {
+						scoreTotal = scoreTotal + question.points
+					} else if (((question.option === 'choix-unique' && bonnesReponses.length > 0) || (question.option === 'choix-multiples' && reponseCorrecte.every(i => item.reponse[indexQuestion].includes(i)) === true && mauvaisesReponses.length === 0)) && donnees.options.points === 'classique' && !question.hasOwnProperty('points')) {
+						scoreTotal = scoreTotal + 1000
+					} else if (((question.option === 'choix-unique' && bonnesReponses.length > 0) || (question.option === 'choix-multiples' && reponseCorrecte.every(i => item.reponse[indexQuestion].includes(i)) === true && mauvaisesReponses.length === 0)) && donnees.options.points !== 'classique' && question.hasOwnProperty('points')) {
+						scoreTotal = scoreTotal + Math.round(question.points - (item.temps[indexQuestion] * multiplicateurSecondes))
+					} else if (((question.option === 'choix-unique' && bonnesReponses.length > 0) || (question.option === 'choix-multiples' && reponseCorrecte.every(i => item.reponse[indexQuestion].includes(i)) === true && mauvaisesReponses.length === 0)) && donnees.options.points !== 'classique' && !question.hasOwnProperty('points')) {
+						scoreTotal = scoreTotal + Math.round(1000 - (item.temps[indexQuestion] * multiplicateurSecondes))
+					} else if ((bonnesReponses.length - mauvaisesReponses.length) > 0 && donnees.options.points === 'classique' && question.hasOwnProperty('points')) {
+						scoreTotal = scoreTotal + ((question.points / reponseCorrecte.length) * (bonnesReponses.length - mauvaisesReponses.length))
+					} else if ((bonnesReponses.length - mauvaisesReponses.length) > 0 && donnees.options.points === 'classique' && !question.hasOwnProperty('points')) {
+						scoreTotal = scoreTotal + ((1000 / reponseCorrecte.length) * (bonnesReponses.length - mauvaisesReponses.length))
+					} else if ((bonnesReponses.length - mauvaisesReponses.length) > 0 && donnees.options.points !== 'classique' && question.hasOwnProperty('points')) {
+						scoreTotal = scoreTotal + ((Math.round(question.points - (item.temps[indexQuestion] * multiplicateurSecondes)) / reponseCorrecte.length) * (bonnesReponses.length - mauvaisesReponses.length))
+					} else if ((bonnesReponses.length - mauvaisesReponses.length) > 0 && donnees.options.points !== 'classique' && !question.hasOwnProperty('points')) {
+						scoreTotal = scoreTotal + ((Math.round(1000 - (item.temps[indexQuestion] * multiplicateurSecondes)) / reponseCorrecte.length) * (bonnesReponses.length - mauvaisesReponses.length))
+					} else {
+						scoreTotal = scoreTotal + 0
+					}
+				})
+			}
+			return scoreTotal
+		},
+		definirScores (item, donnees) {
+			let score = []
+			if (item.hasOwnProperty('score') && donnees.options.points !== 'classique') {
+				score = item.score
+			} else {
+				donnees.questions.forEach(function (question, indexQuestion) {
+					const reponseCorrecte = []
+					question.items.forEach(function (i) {
+						if (i.reponse === true && i.texte !== '') {
+							reponseCorrecte.push(i.texte)
+						} else if (i.reponse === true && i.image !== '') {
+							reponseCorrecte.push(i.image)
+						}
+					})
+					const bonnesReponses = []
+					const mauvaisesReponses = []
+					question.items.forEach(function (i) {
+						if (i.reponse === true && (item.reponse[indexQuestion].includes(i.texte) || item.reponse[indexQuestion].includes(i.image))) {
+							bonnesReponses.push(i)
+						} else if (i.reponse === false && (item.reponse[indexQuestion].includes(i.texte) || item.reponse[indexQuestion].includes(i.image))) {
+							mauvaisesReponses.push(i)
+						}
+					})
+					let multiplicateurSecondes = 10
+					if (donnees.options.hasOwnProperty('multiplicateur') && donnees.options.multiplicateur > 0) {
+						multiplicateurSecondes = donnees.options.multiplicateur
+					}
+					if (((question.option === 'choix-unique' && bonnesReponses.length > 0) || (question.option === 'choix-multiples' && reponseCorrecte.every(i => item.reponse[indexQuestion].includes(i)) === true && mauvaisesReponses.length === 0)) && donnees.options.points === 'classique' && question.hasOwnProperty('points')) {
+						score.push(question.points)
+					} else if (((question.option === 'choix-unique' && bonnesReponses.length > 0) || (question.option === 'choix-multiples' && reponseCorrecte.every(i => item.reponse[indexQuestion].includes(i)) === true && mauvaisesReponses.length === 0)) && donnees.options.points === 'classique' && !question.hasOwnProperty('points')) {
+						score.push(1000)
+					} else if (((question.option === 'choix-unique' && bonnesReponses.length > 0) || (question.option === 'choix-multiples' && reponseCorrecte.every(i => item.reponse[indexQuestion].includes(i)) === true && mauvaisesReponses.length === 0)) && donnees.options.points !== 'classique' && question.hasOwnProperty('points')) {
+						score.push(Math.round(question.points - (item.temps[indexQuestion] * multiplicateurSecondes)))
+					} else if (((question.option === 'choix-unique' && bonnesReponses.length > 0) || (question.option === 'choix-multiples' && reponseCorrecte.every(i => item.reponse[indexQuestion].includes(i)) === true && mauvaisesReponses.length === 0)) && donnees.options.points !== 'classique' && !question.hasOwnProperty('points')) {
+						score.push(Math.round(1000 - (item.temps[indexQuestion] * multiplicateurSecondes)))
+					} else if ((bonnesReponses.length - mauvaisesReponses.length) > 0 && donnees.options.points === 'classique' && question.hasOwnProperty('points')) {
+						score.push((question.points / reponseCorrecte.length) * (bonnesReponses.length - mauvaisesReponses.length))
+					} else if ((bonnesReponses.length - mauvaisesReponses.length) > 0 && donnees.options.points === 'classique' && !question.hasOwnProperty('points')) {
+						score.push((1000 / reponseCorrecte.length) * (bonnesReponses.length - mauvaisesReponses.length))
+					} else if ((bonnesReponses.length - mauvaisesReponses.length) > 0 && donnees.options.points !== 'classique' && question.hasOwnProperty('points')) {
+						score.push((Math.round(question.points - (item.temps[indexQuestion] * multiplicateurSecondes)) / reponseCorrecte.length) * (bonnesReponses.length - mauvaisesReponses.length))
+					} else if ((bonnesReponses.length - mauvaisesReponses.length) > 0 && donnees.options.points !== 'classique' && !question.hasOwnProperty('points')) {
+						score.push((Math.round(1000 - (item.temps[indexQuestion] * multiplicateurSecondes)) / reponseCorrecte.length) * (bonnesReponses.length - mauvaisesReponses.length))
+					} else {
+						score.push(0)
+					}
+				})
+			}
+			return score
+		},
 		exporter () {
 			this.modaleConfirmation = ''
 			this.chargement = true
 			axios.post(this.hote + '/api/exporter-interaction', {
 				identifiant: this.identifiant,
-				code: this.code
+				code: this.code,
+				admin: ''
 			}).then(function (reponse) {
 				const donnees = reponse.data
 				this.chargement = false
@@ -1488,7 +1598,8 @@ export default {
 			this.chargement = true
 			axios.post(this.hote + '/api/supprimer-interaction', {
 				identifiant: this.identifiant,
-				code: this.code
+				code: this.code,
+				admin: ''
 			}).then(function (reponse) {
 				this.chargement = false
 				const donnees = reponse.data
@@ -1500,9 +1611,9 @@ export default {
 					this.$store.dispatch('modifierMessage', this.$t('actionNonAutorisee'))
 				} else {
 					if (this.statutUtilisateur === 'utilisateur') {
-						this.$router.push('/u/' + this.identifiant)
+						this.$router.replace('/u/' + this.identifiant)
 					} else {
-						this.$router.push('/')
+						this.$router.replace('/')
 					}
 				}
 			}.bind(this)).catch(function () {
@@ -1514,7 +1625,7 @@ export default {
 		seDeconnecter () {
 			axios.post(this.hote + '/api/se-deconnecter').then(function () {
 				this.$store.dispatch('reinitialiser')
-				this.$router.push('/')
+				this.$router.replace('/')
 			}.bind(this)).catch(function () {
 				this.$store.dispatch('modifierMessage', this.$t('erreurCommunicationServeur'))
 			}.bind(this))
@@ -1550,6 +1661,80 @@ export default {
 			} else if (motdepasse === '') {
 				this.$store.dispatch('modifierMessage', this.$t('indiquerMotDePasse'))
 			}
+		},
+		ecouterSocket () {
+			this.$socket.on('connexion', function (donnees) {
+				const utilisateurs = donnees.filter(function (utilisateur) {
+					return utilisateur.identifiant !== this.identifiant
+				}.bind(this))
+				utilisateurs.forEach(function (utilisateur) {
+					utilisateur.connecte = true
+				})
+				this.utilisateurs = utilisateurs
+			}.bind(this))
+
+			this.$socket.on('deconnexion', function (identifiant) {
+				const utilisateurs = this.utilisateurs
+				utilisateurs.forEach(function (utilisateur, index) {
+					if (utilisateur.identifiant === identifiant) {
+						utilisateurs.splice(index, 1, { identifiant: utilisateur.identifiant, nom: utilisateur.nom, connecte: false })
+					}
+				})
+				this.utilisateurs = utilisateurs
+			}.bind(this))
+
+			this.$socket.on('reponse', function (reponse) {
+				if (reponse.code === this.code && reponse.session === this.session) {
+					if (this.type === 'Sondage') {
+						if (this.reponsesSession.map(function (e) { return e.identifiant }).includes(reponse.donnees.identifiant) === true) {
+							this.reponsesSession.forEach(function (item) {
+								if (item.identifiant === reponse.donnees.identifiant) {
+									item.reponse = reponse.donnees.reponse
+									if (item.nom !== reponse.donnees.nom && reponse.donnees.nom !== '') {
+										item.nom = reponse.donnees.nom
+									}
+								}
+							})
+						} else {
+							this.reponsesSession.push(reponse.donnees)
+						}
+					} else if (this.type === 'Questionnaire') {
+						if (this.reponsesSession.map(function (e) { return e.identifiant }).includes(reponse.donnees.identifiant) === true) {
+							this.reponsesSession.forEach(function (item) {
+								if (item.identifiant === reponse.donnees.identifiant) {
+									item.reponse = reponse.donnees.reponse
+									if (reponse.donnees.hasOwnProperty('temps')) {
+										item.temps = reponse.donnees.temps
+									}
+									if (item.nom !== reponse.donnees.nom && reponse.donnees.nom !== '') {
+										item.nom = reponse.donnees.nom
+									}
+								}
+							})
+						} else {
+							this.reponsesSession.push(reponse.donnees)
+						}
+					} else if (this.type === 'Remue-méninges' || this.type === 'Nuage-de-mots') {
+						this.reponsesSession.push(reponse.donnees)
+					}
+				}
+			}.bind(this))
+
+			this.$socket.on('reponses', function (donnees) {
+				if (donnees.code === this.code && donnees.session === this.session) {
+					this.reponsesSession = donnees.reponses
+				}
+			}.bind(this))
+
+			this.$socket.on('modifiernom', function (donnees) {
+				const utilisateurs = this.utilisateurs
+				utilisateurs.forEach(function (utilisateur, index) {
+					if (utilisateur.identifiant === donnees.identifiant) {
+						utilisateurs[index].nom = donnees.nom
+					}
+				})
+				this.utilisateurs = utilisateurs
+			}.bind(this))
 		}
 	}
 }
@@ -1615,7 +1800,7 @@ export default {
 	flex-wrap: wrap;
 	font-weight: 700;
 	border: 2px solid #242f3d;
-	border-radius: 1em;
+	border-radius: 0.5em;
 	background: #e3e9f0;
 	padding: 15px 20px;
 }
@@ -1698,6 +1883,7 @@ export default {
 	font-size: 24px;
 }
 
+#interaction footer .bouton.icone.affiche,
 #interaction footer .bouton.icone.masque,
 #interaction footer .bouton.icone.verrouille {
 	color: #ff7b3c;
@@ -1788,6 +1974,10 @@ export default {
 
 #modale-parametres .actions span.supprimer:hover {
 	background: #d70b00;
+}
+
+#modale-parametres .actions span.exporter {
+	margin-bottom: 0;
 }
 
 #modale-parametres .conteneur p {

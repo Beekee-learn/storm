@@ -82,5 +82,33 @@ module.exports = {
 		messagesSupprimes: 'Mensajes borrados',
 		motsSupprimes: 'Palabras borradas',
 		copieDe: 'Copia de '
+	},
+	it: {
+		sondage: 'Sondaggio',
+		remueMeninges: 'Brainstorming',
+		questionnaire: 'Questionario',
+		nuageDeMots: 'Nuvola di parole',
+		question: 'Domanda',
+		reponses: 'Risposta',
+		demarre: 'Inizia',
+		termine: 'Finisci',
+		progression: 'Flusso:',
+		progressionLibre: 'Libero',
+		progressionAnimateur: 'Gestito dal conduttore',
+		bonneReponse: 'Risposta esatta',
+		classement: 'Classifica',
+		points: 'punti',
+		description: 'Descrizione',
+		support: 'Media',
+		image: 'Immagine:',
+		fichierAudio: 'File audio:',
+		video: 'Video:',
+		code: 'Codice:',
+		lien: 'Link per i partecipanti:',
+		lienAdmin: 'Link per l\'amministrazione:',
+		motdepasse: 'Password per l\'amministrazione:',
+		messagesSupprimes: 'Messaggi eliminati',
+		motsSupprimes: 'Parole eliminate',
+		copieDe: 'Copia di '
 	}
 }
