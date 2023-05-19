@@ -131,7 +131,9 @@
 								</draggable>
 
 								<span :id="'ajouter' + indexQ" class="ajouter" role="button" tabindex="0" :title="$t('ajouterReponse')" @click="ajouterItem(indexQ, 'Sondage')" v-if="q.items.length < 26"><i class="material-icons">add_circle_outline</i></span>
+							</div>
 
+							<div :id="'actions' + indexQ" class="section" :key="'actions_' + indexQ">
 								<span class="bouton supprimer" role="button" tabindex="0" @click="supprimerQuestion(indexQ)" v-if="questions.length > 1">{{ $t('supprimer') }}</span>
 								<span class="bouton dupliquer" role="button" tabindex="0" @click="dupliquerQuestion(indexQ)">{{ $t('dupliquer') }}</span>
 							</div>

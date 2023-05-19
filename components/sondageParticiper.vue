@@ -11,13 +11,13 @@
 		</div>
 
 		<div id="support" v-if="indexQuestion > -1 && Object.keys(support).length > 0">
-			<span class="bouton" role="button" tabindex="0" @click="afficherMedia">{{ $t('afficherSupport') }}</span>
+			<span class="bouton" role="button" tabindex="0" @click="afficherSupport">{{ $t('afficherSupport') }}</span>
 		</div>
 
 		<div id="description" v-if="description !== '' || Object.keys(support).length > 0" v-show="indexQuestion === -1">
 			<div class="description" v-if="description !== ''" v-html="description" />
 			<div class="support" v-if="Object.keys(support).length > 0">
-				<img v-if="support.type === 'image'" :src="'/fichiers/' + code + '/' + support.fichier" :alt="support.alt" @click="afficherImage($event, '/fichiers/' + code + '/' + support.fichier)">
+				<img v-if="support.type === 'image'" :src="'/fichiers/' + code + '/' + support.fichier" :alt="support.alt" @click="afficherImage('/fichiers/' + code + '/' + support.fichier)">
 				<audio v-else-if="support.type === 'audio'" controls :src="'/fichiers/' + code + '/' + support.fichier" />
 				<div class="video" v-else-if="support.type === 'video'">
 					<iframe :src="support.lien" allowfullscreen />
@@ -73,36 +73,6 @@
 				</div>
 			</transition-group>
 		</div>
-
-		<div class="conteneur-modale" v-if="modale === 'image'">
-			<div id="modale-image" class="modale">
-				<div class="conteneur">
-					<div class="contenu">
-						<img :src="image" :alt="$t('image')">
-						<div class="actions">
-							<span class="bouton" role="button" tabindex="0" @click="fermerModaleImage">{{ $t('fermer') }}</span>
-						</div>
-					</div>
-				</div>
-			</div>
-		</div>
-
-		<div class="conteneur-modale" v-else-if="modale === 'media'">
-			<div id="modale-media" class="modale">
-				<div class="conteneur">
-					<div class="contenu">
-						<img v-if="support.type === 'image'" :src="'/fichiers/' + code + '/' + support.fichier" :alt="$t('image')">
-						<audio v-else-if="support.type === 'audio'" controls :src="'/fichiers/' + code + '/' + support.fichier" />
-						<div class="video" v-else-if="support.type === 'video'">
-							<iframe :src="support.lien" allowfullscreen />
-						</div>
-						<div class="actions">
-							<span class="bouton" role="button" tabindex="0" @click="fermerModale">{{ $t('fermer') }}</span>
-						</div>
-					</div>
-				</div>
-			</div>
-		</div>
 	</div>
 </template>
 
@@ -128,9 +98,7 @@ export default {
 			support: {},
 			options: {},
 			questions: [],
-			reponse: [],
-			modale: '',
-			image: ''
+			reponse: []
 		}
 	},
 	computed: {

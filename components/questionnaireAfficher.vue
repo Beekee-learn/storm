@@ -118,7 +118,7 @@
 								<span class="question">{{ q.question }}</span>
 								<span class="support" @click="afficherImage($event, '/fichiers/' + code + '/' + q.support.image)" :title="$t('afficherImage')"><img :src="'/fichiers/' + code + '/' + q.support.image" :alt="q.support.alt"></span>
 							</div>
-							<div class="question" v-else-if="q.question !== ''" v-html="q.question " />
+							<div class="question" v-else-if="q.question !== ''" v-html="q.question" />
 							<div class="support" v-else-if="Object.keys(q.support).length > 0">
 								<img :src="'/fichiers/' + code + '/' + q.support.image" :alt="q.support.alt" @click="afficherImage($event, '/fichiers/' + code + '/' + q.support.image)" :title="$t('afficherImage')">
 							</div>
@@ -157,10 +157,6 @@
 			<div class="section">
 				<span class="bouton" role="button" tabindex="0" @click="$emit('demarrer')" v-if="statut === 'attente'">{{ $t('demarrerQuestionnaire') }}</span>
 
-				<span class="bouton icone" role="button" tabindex="0" :title="$t('afficherReponse')" @click="afficherReponse" v-if="statut === 'ouvert' && indexQuestion > -1 && !reponseVisible && !tableauResultats"><i class="material-icons">unpublished</i></span>
-
-				<span class="bouton icone" role="button" tabindex="0" :title="$t('masquerReponse')" @click="afficherReponse" v-else-if="statut === 'ouvert' && indexQuestion > -1 && reponseVisible && !tableauResultats"><i class="material-icons">check_circle</i></span>
-
 				<span class="bouton" role="button" tabindex="0" @click="modifierIndexQuestion" v-if="statut === 'ouvert' && indexQuestion === -1 && donnees.options.classement === true">{{ $t('suivant') }}</span>
 
 				<span class="bouton" role="button" tabindex="0" @click="modifierIndexQuestion" v-else-if="statut === 'ouvert' && indexQuestion < (questions.length - 1) && donnees.options.classement === false">{{ $t('suivant') }}</span>
@@ -197,7 +193,22 @@
 							</div>
 						</div>
 
-						<div id="items" class="items">
+						<div id="items" class="items resultats" v-if="resultatsVisiblesModale">
+							<div :id="'m_item' + index" class="item" v-for="(item, index) in donneesQuestion.items" :class="{'reponse': statistiques[indexQuestionTableau].pourcentages[index] > 0, 'correct': reponseVisibleModale && item.reponse}" :key="'m_item_' + index">
+								<div class="progression" :style="{'width': statistiques[indexQuestionTableau].pourcentages[index] + '%'}" />
+								<div class="contenu">
+									<span class="index">{{ alphabet[index].toUpperCase() }}</span>
+									<span class="image" @click="afficherImage($event, '/fichiers/' + code + '/' + item.image)" v-if="item.image !== ''"><img :src="'/fichiers/' + code + '/' + item.image" :alt="item.alt"></span>
+									<span class="texte" v-if="item.texte !== ''">{{ item.texte }}</span>
+								</div>
+								<div class="statistiques">
+									<span class="personnes">{{ statistiques[indexQuestionTableau].personnes[index] }} <i class="material-icons">person</i></span>
+									<span class="pourcentages">{{ statistiques[indexQuestionTableau].pourcentages[index] }}%</span>
+								</div>
+							</div>
+						</div>
+
+						<div id="items" class="items" v-else>
 							<div :id="'m_item_' + index" class="item" v-for="(item, index) in donneesQuestion.items" :class="{'correct': reponseVisibleModale && item.reponse}" :key="'m_item_' + index">
 								<span class="index">{{ alphabet[index].toUpperCase() }}</span>
 								<span class="image" @click="afficherImage($event, '/fichiers/' + code + '/' + item.image)" v-if="item.image !== ''"><img :src="'/fichiers/' + code + '/' + item.image" :alt="item.alt"></span>
@@ -221,9 +232,11 @@
 				<footer class="footer">
 					<span class="bouton icone" role="button" tabindex="0" :title="$t('questionPrecedente')" :class="{'invisible': (indexQuestionTableau === -1 && (description !== '' || Object.keys(support).length > 0)) || (indexQuestionTableau === 0 && description === '' && Object.keys(support).length === 0)}" @click="modifierIndexQuestionTableau('precedente')"><i class="material-icons">arrow_back</i></span>
 
-					<span class="bouton icone" role="button" tabindex="0" :title="$t('afficherReponse')" @click="reponseVisibleModale = true" v-if="!reponseVisibleModale && indexQuestionTableau > -1"><i class="material-icons">visibility_off</i></span>
+					<span class="bouton icone" role="button" tabindex="0" :title="$t('afficherReponse')" @click="reponseVisibleModale = true" v-if="!reponseVisibleModale && indexQuestionTableau > -1"><i class="material-icons">unpublished</i></span>
+					<span class="bouton icone" role="button" tabindex="0" :title="$t('masquerReponse')" @click="reponseVisibleModale = false" v-else-if="reponseVisibleModale && indexQuestionTableau > -1"><i class="material-icons">check_circle</i></span>
 
-					<span class="bouton icone" role="button" tabindex="0" :title="$t('masquerReponse')" @click="reponseVisibleModale = false" v-else-if="reponseVisibleModale && indexQuestionTableau > -1"><i class="material-icons">visibility</i></span>
+					<span class="bouton icone" role="button" tabindex="0" :title="$t('afficherResultats')" @click="resultatsVisiblesModale = true" v-if="!resultatsVisiblesModale && indexQuestionTableau > -1"><i class="material-icons">visibility_off</i></span>
+					<span class="bouton icone" role="button" tabindex="0" :title="$t('masquerResultats')" @click="resultatsVisiblesModale = false" v-else-if="resultatsVisiblesModale && indexQuestionTableau > -1"><i class="material-icons">visibility</i></span>
 
 					<span class="bouton icone" role="button" tabindex="0" :title="$t('questionSuivante')" :class="{'invisible': indexQuestionTableau === (donnees.questions.length - 1)}" @click="modifierIndexQuestionTableau('suivante')"><i class="material-icons">arrow_forward</i></span>
 				</footer>
@@ -292,7 +305,8 @@ export default {
 		resultats: Boolean,
 		utilisateurs: Array,
 		classement: Array,
-		indexQuestion: Number
+		indexQuestion: Number,
+		reponseVisible: Boolean
 	},
 	data () {
 		return {
@@ -300,7 +314,6 @@ export default {
 			support: {},
 			options: {},
 			questions: [],
-			reponseVisible: false,
 			tableauResultats: false,
 			modale: '',
 			image: '',
@@ -309,6 +322,7 @@ export default {
 			donneesQuestion: {},
 			indexQuestionTableau: -1,
 			reponseVisibleModale: false,
+			resultatsVisiblesModale: false,
 			triTableau: 'nom',
 			nomsVisible: true,
 			liste: ''
@@ -319,14 +333,10 @@ export default {
 			return this.$store.state.hote
 		},
 		utilisateursTableau () {
-			let utilisateurs = []
-			if (this.options.modalite === 'synchrone') {
-				utilisateurs = JSON.parse(JSON.stringify(this.utilisateurs))
-			} else {
-				this.reponses.forEach(function (reponse) {
-					utilisateurs.push({ identifiant: reponse.identifiant, nom: reponse.nom })
-				})
-			}
+			const utilisateurs = []
+			this.reponses.forEach(function (reponse) {
+				utilisateurs.push({ identifiant: reponse.identifiant, nom: reponse.nom })
+			})
 			if (this.triTableau === 'score') {
 				utilisateurs.forEach(function (utilisateur, index) {
 					this.classement.forEach(function (u) {
@@ -336,7 +346,7 @@ export default {
 					})
 				}.bind(this))
 				utilisateurs.forEach(function (utilisateur, index) {
-					if (!utilisateur.score) {
+					if (!utilisateur.hasOwnProperty('score')) {
 						utilisateurs[index].score = 0
 					}
 				})
@@ -358,7 +368,7 @@ export default {
 					})
 				}.bind(this))
 				utilisateurs.forEach(function (utilisateur, index) {
-					if (!utilisateur.reponses) {
+					if (!utilisateur.hasOwnProperty('reponses')) {
 						utilisateurs[index].reponses = 0
 					}
 				})
@@ -405,8 +415,8 @@ export default {
 		}
 	},
 	watch: {
-		indexQuestion: function () {
-			this.reponseVisible = false
+		indexQuestionTableau: function () {
+			this.reponseVisibleModale = false
 		}
 	},
 	created () {
@@ -415,13 +425,18 @@ export default {
 		this.options = this.donnees.options
 		this.questions = this.donnees.questions
 	},
+	mounted () {
+		this.$nextTick(function () {
+			window.MathJax.typeset()
+		})
+	},
 	methods: {
-		afficherReponse () {
-			this.reponseVisible = !this.reponseVisible
-		},
 		modifierIndexQuestion () {
 			const indexQuestion = this.indexQuestion + 1
 			this.$emit('index', indexQuestion)
+			this.$nextTick(function () {
+				window.MathJax.typeset()
+			})
 		},
 		afficherClassement () {
 			this.$emit('classement')
@@ -429,6 +444,9 @@ export default {
 		afficherResultats () {
 			this.tableauResultats = !this.tableauResultats
 			this.$emit('tableau-resultats', this.tableauResultats)
+			this.$nextTick(function () {
+				window.MathJax.typeset()
+			})
 		},
 		definirScore (identifiant) {
 			let score = 0
@@ -452,35 +470,101 @@ export default {
 					reponseCorrecte.push(item.image)
 				}
 			})
+			const bonnesReponses = []
+			const mauvaisesReponses = []
+			this.questions[indexQuestion].items.forEach(function (question) {
+				if (question.reponse === true) {
+					this.reponses.forEach(function (item) {
+						if (item.identifiant === identifiant && (item.reponse[indexQuestion].includes(question.texte) || item.reponse[indexQuestion].includes(question.image))) {
+							bonnesReponses.push(question)
+						}
+					})
+				} else if (question.reponse === false) {
+					this.reponses.forEach(function (item) {
+						if (item.identifiant === identifiant && (item.reponse[indexQuestion].includes(question.texte) || item.reponse[indexQuestion].includes(question.image))) {
+							mauvaisesReponses.push(question)
+						}
+					})
+				}
+			}.bind(this))
 			this.reponses.forEach(function (item) {
 				if (item.identifiant === identifiant) {
-					if (reponseCorrecte.every(i => item.reponse[indexQuestion].includes(i)) === true) {
+					if (reponseCorrecte.every(i => item.reponse[indexQuestion].includes(i)) === true && mauvaisesReponses.length === 0) {
 						bonneReponse = true
-					} else if (item.score[indexQuestion] > 0) {
+					} else if (bonnesReponses.length > mauvaisesReponses.length) {
 						reponsePartielle = true
 					}
 					reponses = item.reponse[indexQuestion].length
-					score = item.score[indexQuestion]
+
+					if (item.hasOwnProperty('score') && this.options.points !== 'classique') {
+						score = item.score[indexQuestion]
+					} else {
+						let multiplicateurSecondes = 10
+						if (this.options.hasOwnProperty('multiplicateur') && this.options.multiplicateur > 0) {
+							multiplicateurSecondes = this.options.multiplicateur
+						}
+						const question = this.questions[indexQuestion]
+						if (((question.option === 'choix-unique' && bonnesReponses.length > 0) || (question.option === 'choix-multiples' && reponseCorrecte.every(i => item.reponse[indexQuestion].includes(i)) === true && mauvaisesReponses.length === 0)) && this.options.points === 'classique' && question.hasOwnProperty('points')) {
+							score = question.points
+						} else if (((question.option === 'choix-unique' && bonnesReponses.length > 0) || (question.option === 'choix-multiples' && reponseCorrecte.every(i => item.reponse[indexQuestion].includes(i)) === true && mauvaisesReponses.length === 0)) && this.options.points === 'classique' && !question.hasOwnProperty('points')) {
+							score = 1000
+						} else if (((question.option === 'choix-unique' && bonnesReponses.length > 0) || (question.option === 'choix-multiples' && reponseCorrecte.every(i => item.reponse[indexQuestion].includes(i)) === true && mauvaisesReponses.length === 0)) && this.options.points !== 'classique' && question.hasOwnProperty('points')) {
+							score = Math.round(question.points - (item.temps[indexQuestion] * multiplicateurSecondes))
+							if (score < (question.points / 10)) {
+								score = Math.round(question.points / 10)
+							}
+						} else if (((question.option === 'choix-unique' && bonnesReponses.length > 0) || (question.option === 'choix-multiples' && reponseCorrecte.every(i => item.reponse[indexQuestion].includes(i)) === true && mauvaisesReponses.length === 0)) && this.options.points !== 'classique' && !question.hasOwnProperty('points')) {
+							score = Math.round(1000 - (item.temps[indexQuestion] * multiplicateurSecondes))
+							if (score < 100) {
+								score = 100
+							}
+						} else if ((bonnesReponses.length - mauvaisesReponses.length) > 0 && this.options.points === 'classique' && question.hasOwnProperty('points')) {
+							score = ((question.points / reponseCorrecte.length) * (bonnesReponses.length - mauvaisesReponses.length))
+						} else if ((bonnesReponses.length - mauvaisesReponses.length) > 0 && this.options.points === 'classique' && !question.hasOwnProperty('points')) {
+							score = ((1000 / reponseCorrecte.length) * (bonnesReponses.length - mauvaisesReponses.length))
+						} else if ((bonnesReponses.length - mauvaisesReponses.length) > 0 && this.options.points !== 'classique' && question.hasOwnProperty('points')) {
+							let points = Math.round(question.points - (item.temps[indexQuestion] * multiplicateurSecondes))
+							if (points < (question.points / 10)) {
+								points = Math.round(question.points / 10)
+							}
+							score = ((points / reponseCorrecte.length) * (bonnesReponses.length - mauvaisesReponses.length))
+						} else if ((bonnesReponses.length - mauvaisesReponses.length) > 0 && this.options.points !== 'classique' && !question.hasOwnProperty('points')) {
+							let points = Math.round(1000 - (item.temps[indexQuestion] * multiplicateurSecondes))
+							if (points < 100) {
+								points = 100
+							}
+							score = score + ((points / reponseCorrecte.length) * (bonnesReponses.length - mauvaisesReponses.length))
+						} else {
+							score = score + 0
+						}
+					}
 				}
-			})
+			}.bind(this))
 			return { bonneReponse: bonneReponse, reponsePartielle: reponsePartielle, reponses: reponses, score: score }
 		},
 		afficherSupport () {
 			this.donneesQuestion.type = 'support'
 			this.indexQuestionTableau = -1
 			this.modaleQuestion = true
+			this.$nextTick(function () {
+				window.MathJax.typeset()
+			})
 		},
 		afficherQuestion (donneesQuestion, indexQuestionTableau) {
 			this.donneesQuestion = donneesQuestion
 			this.donneesQuestion.type = 'question'
 			this.indexQuestionTableau = indexQuestionTableau
 			this.modaleQuestion = true
+			this.$nextTick(function () {
+				window.MathJax.typeset()
+			})
 		},
 		fermerModaleQuestion () {
 			this.modaleQuestion = false
 			this.donneesQuestion = {}
 			this.indexQuestionTableau = -1
 			this.reponseVisibleModale = false
+			this.resultatsVisiblesModale = false
 		},
 		modifierIndexQuestionTableau (direction) {
 			if (direction === 'precedente') {
@@ -489,12 +573,16 @@ export default {
 				this.indexQuestionTableau++
 			}
 			this.reponseVisibleModale = false
+			this.resultatsVisiblesModale = false
 			if (this.indexQuestionTableau === -1) {
 				this.donneesQuestion.type = 'support'
 			} else {
 				this.donneesQuestion = this.donnees.questions[this.indexQuestionTableau]
 				this.donneesQuestion.type = 'question'
 			}
+			this.$nextTick(function () {
+				window.MathJax.typeset()
+			})
 		},
 		cacherNoms () {
 			this.nomsVisible = false

@@ -11,26 +11,32 @@ export default {
 		},
 		ajouterVideo () {
 			let id
-			let regExp = RegExp('<iframe(.+)</iframe>', 'g')
-			if (this.verifierURL(this.lien) === true) {
-				if (this.lien.includes('ladigitale.dev/digiplay/inc/video.php') && regExp.test(this.lien) === true) {
-					this.lien = this.lien.match(/<iframe [^>]*src="[^"]*"[^>]*>/g).map(x => x.replace(/.*src="([^"]*)".*/, '$1'))[0]
+			let lien
+			// eslint-disable-next-line
+			const regExpIframe = RegExp('<iframe(.+)</iframe>', 'g')
+			// eslint-disable-next-line
+			const regExpYT = /http(?:s?):\/\/(?:www\.)?youtu(?:be\.com\/watch\?v=|\.be\/)([\w\-\_]*)(&(amp;)?[\w\?=]*)?/
+			if (this.lien.includes('ladigitale.dev/digiview/inc/video.php') && regExpIframe.test(this.lien) === true) {
+				lien = this.lien.match(/<iframe [^>]*src="[^"]*"[^>]*>/g).map(x => x.replace(/.*src="([^"]*)".*/, '$1'))[0]
+				if (this.verifierURL(lien) === true) {
 					id = this.lien.match(/videoId=(.*?)&vignette/)[1]
-					this.support = { lien: this.lien, vignette: 'https://i.ytimg.com/vi/' + id + '/default.jpg', fichier: '', type: 'video' }
+					this.support = { lien: lien, vignette: 'https://i.ytimg.com/vi/' + id + '/default.jpg', fichier: '', type: 'video' }
 					this.fermerModaleAjouterMedia()
-				} else {
-					regExp = /^.*(youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/
-					if (this.lien.match(regExp)) {
-						id = this.lien.match(regExp)[2]
-						this.support = { lien: 'https://www.youtube-nocookie.com/embed/' + id, vignette: 'https://i.ytimg.com/vi/' + id + '/default.jpg', fichier: '', type: 'video' }
-						this.fermerModaleAjouterMedia()
-					}
 				}
+			} else if (this.verifierURL(this.lien) === true && regExpYT.test(this.lien) === true) {
+				id = this.lien.match(/^.*(youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/)[2]
+				this.support = { lien: 'https://www.youtube-nocookie.com/embed/' + id, vignette: 'https://i.ytimg.com/vi/' + id + '/default.jpg', fichier: '', type: 'video' }
+				this.fermerModaleAjouterMedia()
 			}
 		},
-		verifierURL (url) {
-			const res = url.match(/(http(s)?:\/\/.)?(www\.)?[-a-zA-Z0-9@:%._~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_.~#?&//=]*)/g)
-			return (res !== null)
+		verifierURL (lien) {
+			let url
+			try {
+				url = new URL(lien)
+			} catch (_) {
+				return false
+			}
+			return url.protocol === 'http:' || url.protocol === 'https:'
 		},
 		televerserMedia (event) {
 			this.fermerModaleAjouterMedia()

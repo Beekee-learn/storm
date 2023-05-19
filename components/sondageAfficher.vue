@@ -359,6 +359,11 @@ export default {
 			this.$emit('index', 0)
 		}
 	},
+	mounted () {
+		this.$nextTick(function () {
+			window.MathJax.typeset()
+		})
+	},
 	methods: {
 		modifierIndexQuestion (direction) {
 			let indexQuestion
@@ -368,6 +373,9 @@ export default {
 				indexQuestion = this.indexQuestion - 1
 			}
 			this.$emit('index', indexQuestion)
+			this.$nextTick(function () {
+				window.MathJax.typeset()
+			})
 		},
 		afficherModaleQuestion () {
 			if (this.description === '' && Object.keys(this.support).length === 0) {
@@ -376,6 +384,9 @@ export default {
 				this.indexQuestionModale = -1
 			}
 			this.modaleQuestion = true
+			this.$nextTick(function () {
+				window.MathJax.typeset()
+			})
 		},
 		fermerModaleQuestion () {
 			this.modaleQuestion = false
@@ -387,6 +398,9 @@ export default {
 			} else if (direction === 'suivante') {
 				this.indexQuestionModale++
 			}
+			this.$nextTick(function () {
+				window.MathJax.typeset()
+			})
 		}
 	}
 }
