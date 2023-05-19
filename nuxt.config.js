@@ -75,7 +75,7 @@ module.exports = {
 		lazy: true,
 		langDir: 'lang/',
 		vueI18n: {
-			fallbackLocale: 'fr'
+			fallbackLocale: 'en'
 		}
 	},
 	router: {
