@@ -52,7 +52,7 @@
 			</div>
 
 			<div id="questions" :class="{'avec-progression': indexQuestion > -1 && questions.length > 1}">
-				<transition-group name="fondu">
+				<TransitionGroup name="fondu">
 					<div class="q" v-for="(q, indexQ) in questions" v-show="indexQuestion === indexQ" :key="'q_' + indexQ">
 						<div :id="'question' + indexQ">
 							<div class="question-et-support" v-if="q.question !== '' && Object.keys(q.support).length > 0">
@@ -65,7 +65,7 @@
 							</div>
 						</div>
 
-						<div :id="'items' + indexQ" class="items resultats" v-if="resultats && !classementResultats">
+						<div :id="'items' + indexQ" class="items resultats" v-if="resultats && !classementResultats && q.option !== 'texte-court'">
 							<template v-for="(item, index) in q.items">
 								<div :id="'item' + indexQ + '_' + index" class="item" :class="{'reponse': statistiques[indexQ].pourcentages[index] > 0}" v-if="item.texte !== '' || item.image !== ''" :key="'item_' + indexQ + '_' + index">
 									<div class="progression" :style="{'width': statistiques[indexQ].pourcentages[index] + '%'}" />
@@ -82,7 +82,7 @@
 								</div>
 							</template>
 						</div>
-						<div :id="'items' + indexQ" class="items resultats" v-else-if="resultats && classementResultats">
+						<div :id="'items' + indexQ" class="items resultats" v-else-if="resultats && classementResultats && q.option !== 'texte-court'">
 							<template v-for="(item, index) in itemsClasses">
 								<div :id="'item' + indexQ + '_' + index" class="item" :class="{'reponse': item.pourcentages > 0}" v-if="item.texte !== '' || item.image !== ''" :key="'item_' + indexQ + '_' + index">
 									<div class="progression" :style="{'width': item.pourcentages + '%'}" />
@@ -99,15 +99,53 @@
 								</div>
 							</template>
 						</div>
-						<div :id="'items' + indexQ" class="items" v-else>
+						<div :id="'items' + indexQ" class="items" v-else-if="!resultats && q.option !== 'texte-court'">
 							<div :id="'item' + indexQ + '_' + index" class="item" v-for="(item, index) in q.items" :key="'item_' + indexQ + '_' + index">
 								<span class="index">{{ alphabet[index].toUpperCase() }}</span>
 								<span class="image" @click="afficherImage($event, '/fichiers/' + code + '/' + item.image)" v-if="item.image !== ''"><img :src="'/fichiers/' + code + '/' + item.image" :alt="item.alt"></span>
 								<span class="texte" v-if="item.texte !== ''">{{ item.texte }}</span>
 							</div>
 						</div>
+						<div :id="'items' + indexQ" class="items resultats" v-else-if="resultats && !classementResultats && q.option === 'texte-court'">
+							<template v-for="(item, index) in definirItemsTexte(indexQ)">
+								<div :id="'item' + indexQ + '_' + index" class="item" :class="{'reponse': statistiques[indexQ].pourcentages[index] > 0}" v-if="item.texte !== ''" :key="'item_' + indexQ + '_' + index">
+									<div class="progression" :style="{'width': statistiques[indexQ].pourcentages[index] + '%'}" />
+									<div class="contenu">
+										<span class="index">{{ index + 1 }}</span>
+										<span class="texte">{{ item.texte }}</span>
+									</div>
+									<div class="statistiques">
+										<span class="personnes curseur" @click="afficherModaleListe(statistiques[indexQ].liste[index])" v-if="options.nom === 'obligatoire' && statistiques[indexQ].personnes[index] > 0">{{ statistiques[indexQ].personnes[index] }} <i class="material-icons">person</i></span>
+										<span class="personnes" v-else>{{ statistiques[indexQ].personnes[index] }} <i class="material-icons">person</i></span>
+										<span class="pourcentages">{{ statistiques[indexQ].pourcentages[index] }}%</span>
+									</div>
+								</div>
+							</template>
+						</div>
+						<div :id="'items' + indexQ" class="items resultats" v-else-if="resultats && classementResultats && q.option === 'texte-court'">
+							<template v-for="(item, index) in itemsClasses">
+								<div :id="'item' + indexQ + '_' + index" class="item" :class="{'reponse': item.pourcentages > 0}" v-if="item.texte !== ''" :key="'item_' + indexQ + '_' + index">
+									<div class="progression" :style="{'width': item.pourcentages + '%'}" />
+									<div class="contenu">
+										<span class="index">{{ index + 1 }}</span>
+										<span class="texte">{{ item.texte }}</span>
+									</div>
+									<div class="statistiques">
+										<span class="personnes curseur" @click="afficherModaleListe(item.liste)" v-if="options.nom === 'obligatoire' && item.liste.length > 0">{{ item.personnes }} <i class="material-icons">person</i></span>
+										<span class="personnes" v-else>{{ item.personnes }} <i class="material-icons">person</i></span>
+										<span class="pourcentages">{{ item.pourcentages }}%</span>
+									</div>
+								</div>
+							</template>
+						</div>
+						<div :id="'items' + indexQ" class="items" v-else-if="!resultats && q.option === 'texte-court'">
+							<div :id="'item' + indexQ + '_' + index" class="item" v-for="(item, index) in definirItemsTexte(indexQ)" :key="'item_' + indexQ + '_' + index">
+								<span class="index">{{ index + 1 }}</span>
+								<span class="texte">{{ item.texte }}</span>
+							</div>
+						</div>
 					</div>
-				</transition-group>
+				</TransitionGroup>
 			</div>
 		</div>
 
@@ -130,8 +168,8 @@
 			</div>
 		</div>
 
-		<div class="conteneur-modale" v-if="modaleQuestion">
-			<div id="modale-question" class="modale">
+		<div class="conteneur-modale" role="dialog" tabindex="-1" v-if="modaleQuestion">
+			<div id="modale-question" class="modale" role="document">
 				<header>
 					<span class="titre" v-if="indexQuestionModale === -1 && description !== '' && Object.keys(support).length === 0">{{ $t('description') }}</span>
 					<span class="titre" v-else-if="indexQuestionModale === -1 && description === '' && Object.keys(support).length > 0">{{ $t('support') }}</span>
@@ -142,7 +180,7 @@
 				<div class="conteneur">
 					<div class="contenu" v-if="indexQuestionModale > -1">
 						<div id="m_questions">
-							<transition-group name="fondu">
+							<TransitionGroup name="fondu">
 								<div class="m_q" v-for="(q, indexQ) in questions" v-show="indexQuestionModale === indexQ" :key="'m_q_' + indexQ">
 									<div :id="'m_question' + indexQ">
 										<div class="question-et-support" v-if="q.question !== '' && Object.keys(q.support).length > 0">
@@ -154,25 +192,28 @@
 											<img :src="'/fichiers/' + code + '/' + q.support.image" :alt="q.support.alt" @click="afficherImage($event, '/fichiers/' + code + '/' + q.support.image)" :title="$t('afficherImage')">
 										</div>
 									</div>
+
 									<div id="m_items" class="items resultats">
-										<template v-for="(item, index) in itemsClassesModale">
-											<div :id="'m_item' + indexQ + '_' + index" class="item" :class="{'reponse': item.pourcentages > 0}" :key="'m_item' + indexQ + '_' + index">
-												<div class="progression" :style="{'width': item.pourcentages + '%'}" />
-												<div class="contenu">
-													<span class="index">{{ item.alphabet.toUpperCase() }}</span>
-													<span class="image" @click="afficherImage($event, '/fichiers/' + code + '/' + item.image)" v-if="item.image !== ''"><img :src="'/fichiers/' + code + '/' + item.image" :alt="item.alt"></span>
-													<span class="texte" v-if="item.texte !== ''">{{ item.texte }}</span>
-												</div>
-												<div class="statistiques">
-													<span class="personnes" :title="definirListe(item.liste)" v-if="options.nom === 'obligatoire' && item.liste.length > 0">{{ item.personnes }} <i class="material-icons">person</i></span>
-													<span class="personnes" v-else>{{ item.personnes }} <i class="material-icons">person</i></span>
-													<span class="pourcentages">{{ item.pourcentages }}%</span>
-												</div>
+										<div :id="'m_item' + indexQ + '_' + index" class="item" :class="{'reponse': item.pourcentages > 0}" v-for="(item, index) in itemsClassesModale" :key="'m_item' + indexQ + '_' + index">
+											<div class="progression" :style="{'width': item.pourcentages + '%'}" />
+											<div class="contenu" v-if="q.option !== 'texte-court'">
+												<span class="index">{{ item.alphabet.toUpperCase() }}</span>
+												<span class="image" @click="afficherImage($event, '/fichiers/' + code + '/' + item.image)" v-if="item.image !== ''"><img :src="'/fichiers/' + code + '/' + item.image" :alt="item.alt"></span>
+												<span class="texte" v-if="item.texte !== ''">{{ item.texte }}</span>
 											</div>
-										</template>
+											<div class="contenu" v-else>
+												<span class="index">{{ index + 1 }}</span>
+												<span class="texte">{{ item.texte }}</span>
+											</div>
+											<div class="statistiques">
+												<span class="personnes" :title="definirListe(item.liste)" v-if="options.nom === 'obligatoire' && item.liste.length > 0">{{ item.personnes }} <i class="material-icons">person</i></span>
+												<span class="personnes" v-else>{{ item.personnes }} <i class="material-icons">person</i></span>
+												<span class="pourcentages">{{ item.pourcentages }}%</span>
+											</div>
+										</div>
 									</div>
 								</div>
-							</transition-group>
+							</TransitionGroup>
 						</div>
 					</div>
 					<div class="contenu" v-else>
@@ -196,8 +237,8 @@
 			</div>
 		</div>
 
-		<div class="conteneur-modale" v-else-if="modale === 'liste'">
-			<div id="modale-liste" class="modale">
+		<div class="conteneur-modale" role="dialog" tabindex="-1" v-else-if="modale === 'liste'">
+			<div id="modale-liste" class="modale" role="document">
 				<header>
 					<span class="titre">{{ $t('listeRepondants') }}</span>
 					<span class="fermer" role="button" tabindex="0" @click="fermerModaleListe"><i class="material-icons">close</i></span>
@@ -212,8 +253,8 @@
 			</div>
 		</div>
 
-		<div class="conteneur-modale" v-if="modale === 'image'">
-			<div id="modale-image" class="modale">
+		<div class="conteneur-modale" role="dialog" tabindex="-1" v-if="modale === 'image'">
+			<div id="modale-image" class="modale" role="document">
 				<div class="conteneur">
 					<div class="contenu">
 						<img :src="image" :alt="$t('image')">
@@ -225,8 +266,8 @@
 			</div>
 		</div>
 
-		<div class="conteneur-modale" v-else-if="modale === 'media'">
-			<div id="modale-media" class="modale">
+		<div class="conteneur-modale" role="dialog" tabindex="-1" v-else-if="modale === 'media'">
+			<div id="modale-media" class="modale" role="document">
 				<div class="conteneur">
 					<div class="contenu">
 						<img v-if="support.type === 'image'" :src="'/fichiers/' + code + '/' + support.fichier" :alt="$t('image')">
@@ -245,12 +286,13 @@
 </template>
 
 <script>
-import methodesMultiAfficher from '@/assets/js/methodes-multi-afficher'
+import methodes from '#root/components/js/methodes-multi-afficher'
 
 export default {
 	name: 'SondageAfficher',
-	extends: methodesMultiAfficher,
+	extends: methodes,
 	props: {
+		hote: String,
 		code: String,
 		donnees: Object,
 		reponses: Array,
@@ -275,53 +317,97 @@ export default {
 		}
 	},
 	computed: {
-		hote () {
-			return this.$store.state.hote
-		},
 		statistiques () {
 			const statistiques = []
 			this.questions.forEach(function (question, indexQuestion) {
 				const personnes = []
 				const pourcentages = []
 				const liste = []
-				for (let i = 0; i < question.items.length; i++) {
-					personnes.push(0)
-					pourcentages.push(0)
-					liste.push([])
-				}
-				question.items.forEach(function (item, index) {
-					let reponses = 0
-					const utilisateurs = []
-					this.reponses.forEach(function (donnees) {
-						if (this.donnees.hasOwnProperty('questions')) {
-							donnees.reponse[indexQuestion].forEach(function (reponse) {
-								if (reponse === item.texte || reponse === item.image) {
-									reponses++
-									utilisateurs.push(donnees.identifiant)
-								}
-							})
-						} else if (this.donnees.hasOwnProperty('question')) {
-							donnees.reponse.forEach(function (reponse) {
-								if (reponse === item.texte || reponse === item.image) {
-									reponses++
-									utilisateurs.push(donnees.identifiant)
-								}
-							})
+				if (question.option !== 'texte-court') {
+					for (let i = 0; i < question.items.length; i++) {
+						personnes.push(0)
+						pourcentages.push(0)
+						liste.push([])
+					}
+					question.items.forEach(function (item, index) {
+						let reponses = 0
+						const utilisateurs = []
+						this.reponses.forEach(function (donnees) {
+							if (this.donnees.hasOwnProperty('questions')) {
+								donnees.reponse[indexQuestion].forEach(function (reponse) {
+									if (reponse === item.texte || reponse === item.image) {
+										reponses++
+										utilisateurs.push(donnees.identifiant)
+									}
+								})
+							} else if (this.donnees.hasOwnProperty('question')) {
+								donnees.reponse.forEach(function (reponse) {
+									if (reponse === item.texte || reponse === item.image) {
+										reponses++
+										utilisateurs.push(donnees.identifiant)
+									}
+								})
+							}
+						}.bind(this))
+						if (reponses > 0) {
+							personnes[index] = reponses
+							const pourcentage = (reponses / this.reponses.length) * 100
+							pourcentages[index] = Math.round(pourcentage)
+							liste[index] = utilisateurs
 						}
 					}.bind(this))
-					if (reponses > 0) {
-						personnes[index] = reponses
-						const pourcentage = (reponses / this.reponses.length) * 100
-						pourcentages[index] = Math.round(pourcentage)
-						liste[index] = utilisateurs
+				} else {
+					let items = []
+					this.reponses.forEach(function (donnees) {
+						donnees.reponse[indexQuestion].forEach(function (reponse) {
+							if (!items.includes(reponse.toString().trim())) {
+								items.push(reponse.toString().trim())
+							}
+						})
+					})
+					for (let i = 0; i < items.length; i++) {
+						personnes.push(0)
+						pourcentages.push(0)
+						liste.push([])
 					}
-				}.bind(this))
+					items.forEach(function (item, index) {
+						let total = 0
+						let reponses = 0
+						const utilisateurs = []
+						this.reponses.forEach(function (donnees) {
+							if (this.donnees.hasOwnProperty('questions')) {
+								donnees.reponse[indexQuestion].forEach(function (reponse) {
+									if (item === reponse.toString().trim()) {
+										reponses++
+										utilisateurs.push(donnees.identifiant)
+									}
+								})
+							} else if (this.donnees.hasOwnProperty('question')) {
+								donnees.reponse.forEach(function (reponse) {
+									if (item === reponse.toString().trim()) {
+										reponses++
+										utilisateurs.push(donnees.identifiant)
+									}
+								})
+							}
+						}.bind(this))
+						if (reponses > 0) {
+							personnes[index] = reponses
+							const pourcentage = (reponses / this.reponses.length) * 100
+							pourcentages[index] = Math.round(pourcentage)
+							liste[index] = utilisateurs
+						}
+					}.bind(this))
+				}
 				statistiques.push({ personnes: personnes, pourcentages: pourcentages, liste: liste })
 			}.bind(this))
 			return statistiques
 		},
 		itemsClasses () {
-			const items = JSON.parse(JSON.stringify(this.questions[this.indexQuestion].items))
+			let items = JSON.parse(JSON.stringify(this.questions[this.indexQuestion].items))
+			if (this.questions[this.indexQuestion].option === 'texte-court') {
+				items = this.definirItemsTexte(this.indexQuestion)
+			}
 			items.forEach(function (item, index) {
 				item.personnes = this.statistiques[this.indexQuestion].personnes[index]
 				item.pourcentages = this.statistiques[this.indexQuestion].pourcentages[index]
@@ -334,7 +420,10 @@ export default {
 			return items
 		},
 		itemsClassesModale () {
-			const items = JSON.parse(JSON.stringify(this.questions[this.indexQuestionModale].items))
+			let items = JSON.parse(JSON.stringify(this.questions[this.indexQuestionModale].items))
+			if (this.questions[this.indexQuestionModale].option === 'texte-court') {
+				items = this.definirItemsTexte(this.indexQuestionModale)
+			}
 			items.forEach(function (item, index) {
 				item.personnes = this.statistiques[this.indexQuestionModale].personnes[index]
 				item.pourcentages = this.statistiques[this.indexQuestionModale].pourcentages[index]
@@ -359,7 +448,31 @@ export default {
 			this.$emit('index', 0)
 		}
 	},
+	mounted () {
+		this.$nextTick(function () {
+			window.MathJax.typeset()
+		})
+	},
 	methods: {
+		definirItemsTexte (indexQuestion) {
+			const items = []
+			this.reponses.forEach(function (donnees) {
+				if (this.donnees.hasOwnProperty('questions')) {
+					donnees.reponse[indexQuestion].forEach(function (reponse) {
+						if (!items.map(function (e) { return e.texte }).includes(reponse.toString().trim())) {
+							items.push({ texte: reponse.toString().trim() })
+						}
+					})
+				} else if (this.donnees.hasOwnProperty('question')) {
+					donnees.reponse.forEach(function (reponse) {
+						if (!items.map(function (e) { return e.texte }).includes(reponse.toString().trim())) {
+							items.push({ texte: reponse.toString().trim() })
+						}
+					})
+				}
+			}.bind(this))
+			return items
+		},
 		modifierIndexQuestion (direction) {
 			let indexQuestion
 			if (direction === 'suivant') {
@@ -368,6 +481,9 @@ export default {
 				indexQuestion = this.indexQuestion - 1
 			}
 			this.$emit('index', indexQuestion)
+			this.$nextTick(function () {
+				window.MathJax.typeset()
+			})
 		},
 		afficherModaleQuestion () {
 			if (this.description === '' && Object.keys(this.support).length === 0) {
@@ -376,6 +492,9 @@ export default {
 				this.indexQuestionModale = -1
 			}
 			this.modaleQuestion = true
+			this.$nextTick(function () {
+				window.MathJax.typeset()
+			})
 		},
 		fermerModaleQuestion () {
 			this.modaleQuestion = false
@@ -387,12 +506,15 @@ export default {
 			} else if (direction === 'suivante') {
 				this.indexQuestionModale++
 			}
+			this.$nextTick(function () {
+				window.MathJax.typeset()
+			})
 		}
 	}
 }
 </script>
 
-<style scoped src="@/assets/css/styles-multi-afficher.css"></style>
+<style scoped src="#root/components/css/style-multi-afficher.css"></style>
 
 <style>
 #attente .info-attente p {
@@ -401,5 +523,32 @@ export default {
 
 #attente .info-attente p:last-child {
 	margin-bottom: 0;
+}
+
+#m_questions .m_q {
+	position: absolute;
+	top: 20px;
+	left: 20px;
+	right: 20px;
+	bottom: 20px;
+}
+
+#m_description .video iframe {
+	width: 400px;
+	height: 225px;
+}
+
+@media screen and (max-width: 359px) {
+	#m_description .video iframe {
+		width: 240px;
+		height: 135px;
+	}
+}
+
+@media screen and (min-width: 360px) and (max-width: 499px) {
+	#m_description .video iframe {
+		width: 280px;
+		height: 158px;
+	}
 }
 </style>

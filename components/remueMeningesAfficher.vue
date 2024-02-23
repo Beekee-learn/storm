@@ -59,8 +59,8 @@
 			</div>
 		</div>
 
-		<div class="conteneur-modale" v-if="modale === 'media'">
-			<div id="modale-media" class="modale">
+		<div class="conteneur-modale" role="dialog" tabindex="-1" v-if="modale === 'media'">
+			<div id="modale-media" class="modale" role="document">
 				<div class="conteneur">
 					<div class="contenu">
 						<img v-if="media.type === 'image'" :src="media.fichier" :alt="$t('image')">
@@ -76,8 +76,8 @@
 			</div>
 		</div>
 
-		<div class="conteneur-modale" v-else-if="modale === 'image'">
-			<div id="modale-image" class="modale">
+		<div class="conteneur-modale" role="dialog" tabindex="-1" v-else-if="modale === 'image'">
+			<div id="modale-image" class="modale" role="document">
 				<div class="conteneur">
 					<div class="contenu">
 						<img :src="image" :alt="$t('image')">
@@ -89,8 +89,8 @@
 			</div>
 		</div>
 
-		<div class="conteneur-modale" v-else-if="modale === 'message'">
-			<div id="modale-message" class="modale">
+		<div class="conteneur-modale" role="dialog" tabindex="-1" v-else-if="modale === 'message'">
+			<div id="modale-message" class="modale" role="document">
 				<div class="conteneur">
 					<div class="contenu">
 						<p>{{ message }}</p>
@@ -105,16 +105,16 @@
 </template>
 
 <script>
-import fitty from 'fitty'
-import draggable from 'vuedraggable'
 import imagesLoaded from 'imagesloaded'
+import { VueDraggableNext } from 'vue-draggable-next'
 
 export default {
 	name: 'RemueMeningesAfficher',
 	components: {
-		draggable
+		draggable: VueDraggableNext
 	},
 	props: {
+		hote: String,
 		code: String,
 		donnees: Object,
 		reponses: Array,
@@ -140,14 +140,12 @@ export default {
 			distance: 0
 		}
 	},
-	computed: {
-		hote () {
-			return this.$store.state.hote
-		}
-	},
 	watch: {
-		reponses: function () {
-			this.definirMessages()
+		reponses: {
+			handler () {
+				this.definirMessages()
+			},
+			deep: true
 		}
 	},
 	created () {
@@ -160,12 +158,14 @@ export default {
 	},
 	mounted () {
 		imagesLoaded('#question', function () {
-			this.verifierConteneur()
+			this.$nextTick(function () {
+				window.MathJax.typeset()
+				this.$nextTick(function () {
+					this.verifierConteneur()
+				}.bind(this))
+			}.bind(this))
 		}.bind(this))
 		window.addEventListener('resize', this.verifierConteneur, false)
-	},
-	beforeDestroy () {
-		window.removeEventListener('resize', this.verifierConteneur, false)
 	},
 	methods: {
 		afficherMessage (message) {
@@ -317,7 +317,7 @@ export default {
 }
 </script>
 
-<style scoped src="@/assets/css/styles-mono-afficher.css"></style>
+<style scoped src="#root/components/css/style-afficher.css"></style>
 
 <style scoped>
 #conteneur-categories {
@@ -420,6 +420,7 @@ export default {
 
 #categories .categorie-contenu ul {
 	padding: 15px 0 0;
+	min-height: 12rem;
 }
 
 #conteneur-categories .categorie-contenu li {

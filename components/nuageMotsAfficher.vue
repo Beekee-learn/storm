@@ -20,7 +20,7 @@
 
 		<div id="conteneur-nuage" :style="{'top': hauteurQuestion + 'px', 'height': hauteurConteneur + 'px'}">
 			<vue-word-cloud :animation-duration="350" animation-easing="ease-in-out" :animation-overlap="1" color="#00ced1" font-family="HKGrotesk-ExtraBold" :spacing="1/2" :words="mots" @update:progress="modifierProgression">
-				<template slot-scope="{text, weight, word}">
+				<template v-slot="{text, weight, word}">
 					<div :title="text + ' (' + weight + ')'" style="cursor: pointer;" @click="afficherMot(word)">
 						{{ text }}
 					</div>
@@ -28,8 +28,8 @@
 			</vue-word-cloud>
 		</div>
 
-		<div class="conteneur-modale" v-if="modale === 'media'">
-			<div id="modale-media" class="modale">
+		<div class="conteneur-modale" role="dialog" tabindex="-1" v-if="modale === 'media'">
+			<div id="modale-media" class="modale" role="document">
 				<div class="conteneur">
 					<div class="contenu">
 						<img v-if="media.type === 'image'" :src="media.fichier" :alt="$t('image')">
@@ -45,8 +45,8 @@
 			</div>
 		</div>
 
-		<div class="conteneur-modale" v-else-if="modale === 'mot'">
-			<div id="modale-mot" class="modale">
+		<div class="conteneur-modale" role="dialog" tabindex="-1" v-else-if="modale === 'mot'">
+			<div id="modale-mot" class="modale" role="document">
 				<div class="conteneur">
 					<div class="contenu">
 						<p :style="{'color': mot.color}">{{ mot.text }}</p>
@@ -60,22 +60,24 @@
 			</div>
 		</div>
 
-		<chargement :chargement="chargement" v-if="chargement" />
+		<Chargement v-if="chargement" />
 	</div>
 </template>
 
 <script>
-import fitty from 'fitty'
 import latinise from 'voca/latinise'
 import imagesLoaded from 'imagesloaded'
-import chargement from '@/components/chargement.vue'
+import Chargement from '#root/components/chargement.vue'
+import VueWordCloud from '#root/components/wordcloud'
 
 export default {
 	name: 'NuageMotsAfficher',
 	components: {
-		chargement
+		Chargement,
+		[VueWordCloud.name]: VueWordCloud
 	},
 	props: {
+		hote: String,
 		code: String,
 		donnees: Object,
 		reponses: Array,
@@ -97,14 +99,12 @@ export default {
 			hauteurConteneur: 0
 		}
 	},
-	computed: {
-		hote () {
-			return this.$store.state.hote
-		}
-	},
 	watch: {
-		reponses: function () {
-			this.definirMots()
+		reponses: {
+			handler () {
+				this.definirMots()
+			},
+			deep: true
 		},
 		progression: function (progression) {
 			if (progression === '' || progression === null) {
@@ -129,12 +129,14 @@ export default {
 	},
 	mounted () {
 		imagesLoaded('#question', function () {
-			this.verifierConteneur()
+			this.$nextTick(function () {
+				window.MathJax.typeset()
+				this.$nextTick(function () {
+					this.verifierConteneur()
+				}.bind(this))
+			}.bind(this))
 		}.bind(this))
 		window.addEventListener('resize', this.verifierConteneur, false)
-	},
-	beforeDestroy () {
-		window.removeEventListener('resize', this.verifierConteneur, false)
 	},
 	methods: {
 		definirMots () {
@@ -251,7 +253,7 @@ export default {
 }
 </script>
 
-<style scoped src="@/assets/css/styles-mono-afficher.css"></style>
+<style scoped src="#root/components/css/style-afficher.css"></style>
 
 <style scoped>
 #conteneur-nuage {

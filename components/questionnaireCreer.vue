@@ -4,7 +4,7 @@
 			<h2>{{ $t('descriptionEtSupportFacultatifs') }}</h2>
 			<div class="description">
 				<div class="conteneur-textarea" :class="{'media': Object.keys(support).length > 0}">
-					<textarea-autosize v-model="description" :rows="1" :min-height="46" :max-height="94" :placeholder="$t('description')" />
+					<TextareaAutosize v-model="description" :rows="1" :min-height="46" :max-height="94" :placeholder="$t('description')" />
 				</div>
 				<span class="actions" v-if="chargement === 'media'">
 					<span class="conteneur-chargement">
@@ -59,6 +59,28 @@
 						<span class="coche" />
 					</label>
 				</div>
+				<div class="parametre" v-if="options.reponses === true && options.progression === 'libre'">
+					<h3>{{ $t('retroaction') }}</h3>
+					<label class="bouton-radio">{{ $t('oui') }}
+						<input type="radio" name="retroaction" :checked="options.retroaction === true" @change="modifierParametres('retroaction', true)">
+						<span class="coche" />
+					</label>
+					<label class="bouton-radio">{{ $t('non') }}
+						<input type="radio" name="retroaction" :checked="options.retroaction === false" @change="modifierParametres('retroaction', false)">
+						<span class="coche" />
+					</label>
+				</div>
+				<div class="parametre">
+					<h3>{{ $t('pointsPersonnalises') }}</h3>
+					<label class="bouton-radio">{{ $t('oui') }}
+						<input type="radio" name="pointsPersonnalises" :checked="options.pointsPersonnalises === true" @change="modifierParametres('pointsPersonnalises', true)">
+						<span class="coche" />
+					</label>
+					<label class="bouton-radio">{{ $t('non') }}
+						<input type="radio" name="pointsPersonnalises" :checked="options.pointsPersonnalises === false" @change="modifierParametres('pointsPersonnalises', false)">
+						<span class="coche" />
+					</label>
+				</div>
 				<div class="parametre" v-if="options.progression === 'animateur'">
 					<h3>{{ $t('vitesseCalculPoints') }}</h3>
 					<label class="bouton-radio">{{ $t('oui') }}
@@ -69,6 +91,11 @@
 						<input type="radio" name="points" :checked="options.points === 'classique'" @change="modifierParametres('points', 'classique')">
 						<span class="coche" />
 					</label>
+				</div>
+				<div class="parametre" v-if="options.progression === 'animateur' && options.points === 'vitesse'">
+					<h3 v-if="options.pointsPersonnalises">{{ $t('pointsRetranchesSeconde') }}</h3>
+					<h3 v-else>{{ $t('pointsRetranchesSeconde') }} / 1000</h3>
+					<input type="number" name="multiplicateur" :value="options.multiplicateur" :min="1" @change="modifierParametres('multiplicateur', $event.target.value)">
 				</div>
 				<div class="parametre" v-show="options.progression === 'animateur' && options.nom === 'obligatoire'">
 					<h3>{{ $t('affichageClassement') }}</h3>
@@ -95,108 +122,134 @@
 			</div>
 		</div>
 
-		<draggable id="questions" v-model="questions" draggable=".accordeon" handle=".poignee-accordeon" filter=".desactive" :animation="150" :scroll="true" :force-fallback="true">
-			<template v-for="(q, indexQ) in questions">
-				<div :id="'accordeon' + indexQ" class="section accordeon" role="button" tabindex="0" :key="'accordeon_' + indexQ">
-					<div class="conteneur-accordeon">
-						<div class="en-tete-accordeon">
-							<div class="titre">
-								<span class="poignee poignee-accordeon" :class="{'desactive': questions.length === 1}">
-									<i class="material-icons">drag_indicator</i>
-								</span>
-								<span class="titre-question" @click="gererAccordeon(indexQ)">
-									{{ definirTitre(indexQ) }}
-								</span>
-							</div>
-							<span class="statut" @click="gererAccordeon(indexQ)">
-								<i class="material-icons" v-if="accordeonOuvert !== indexQ" :title="$t('ouvrir')">add</i>
-								<i class="material-icons" v-else :title="$t('fermer')">remove</i>
+		<draggable id="questions" v-model="questions" draggable=".accordeon" handle=".poignee-accordeon" filter=".desactive" :animation="150" :scroll="true" :force-fallback="true" @sort="deplacerQuestion">
+			<div :id="'accordeon' + indexQ" class="section accordeon" role="button" tabindex="0" v-for="(q, indexQ) in questions" :key="'accordeon_' + indexQ">
+				<div class="conteneur-accordeon">
+					<div class="en-tete-accordeon">
+						<div class="titre">
+							<span class="poignee poignee-accordeon" :class="{'desactive': questions.length === 1}">
+								<i class="material-icons">drag_indicator</i>
+							</span>
+							<span class="titre-question" @click="gererAccordeon(indexQ)">
+								{{ definirTitre(indexQ) }}
 							</span>
 						</div>
+						<span class="statut" @click="gererAccordeon(indexQ)">
+							<i class="material-icons" v-if="accordeonOuvert !== indexQ" :title="$t('ouvrir')">add</i>
+							<i class="material-icons" v-else :title="$t('fermer')">remove</i>
+						</span>
+					</div>
 
-						<div class="contenu-accordeon">
-							<div :id="'question' + indexQ" class="section" :key="'question_' + indexQ">
-								<h2>{{ $t('question') }}</h2>
-								<div class="question">
-									<div class="conteneur-textarea" :class="{'image': Object.keys(q.support).length > 0}">
-										<textarea-autosize v-model="q.question" :rows="1" :min-height="46" :max-height="94" :placeholder="$t('question')" />
+					<div class="contenu-accordeon">
+						<div :id="'question' + indexQ" class="section" :key="'question_' + indexQ" v-if="accordeonOuvert === indexQ">
+							<h2>{{ $t('question') }}</h2>
+							<div class="question">
+								<div class="conteneur-textarea" :class="{'image': Object.keys(q.support).length > 0}">
+									<TextareaAutosize v-model="q.question" :rows="1" :min-height="46" :max-height="94" :item-id="'_' + indexQ" :placeholder="$t('question')" />
+								</div>
+								<span class="actions" v-if="chargement === 'support' + indexQ">
+									<span class="conteneur-chargement">
+										<span class="chargement" />
+										<span class="progression">{{ progression }} %</span>
+									</span>
+								</span>
+								<span class="actions" v-else-if="chargement !== 'support' + indexQ && Object.keys(q.support).length === 0">
+									<label :for="'televerser-support' + indexQ" role="button" tabindex="0" :title="$t('ajouterImage')"><i class="material-icons">add_photo_alternate</i></label>
+									<input :id="'televerser-support' + indexQ" type="file" @change="televerserImage(indexQ, 'support', 'Questionnaire')" style="display: none" accept=".jpg, .jpeg, .png, .gif">
+								</span>
+								<span class="actions image" v-else-if="chargement !== 'support' + indexQ && Object.keys(q.support).length > 0" @click="afficherSupport(indexQ, '/fichiers/' + code + '/' + q.support.image)" :title="$t('afficherImage')" :style="{'background-image': 'url(/fichiers/' + code + '/' + q.support.image + ')'}" />
+							</div>
+						</div>
+
+						<div :id="'items' + indexQ" class="section" :key="'items_' + indexQ" v-if="accordeonOuvert === indexQ">
+							<h2>{{ $t('reponses') }}</h2>
+							<div class="options">
+								<label class="bouton-radio">{{ $t('choixUnique') }}
+									<input type="radio" :name="'option' + indexQ" :checked="q.option === 'choix-unique'" @change="modifierOption($event, indexQ, 'choix-unique')">
+									<span class="coche" />
+								</label>
+								<label class="bouton-radio">{{ $t('choixMultiples') }}
+									<input type="radio" :name="'option' + indexQ" :checked="q.option === 'choix-multiples'" @change="modifierOption($event, indexQ, 'choix-multiples')">
+									<span class="coche" />
+								</label>
+								<label class="bouton-radio">{{ $t('texteCourt') }}
+									<input type="radio" :name="'option' + indexQ" :checked="q.option === 'texte-court'" @change="modifierOption($event, indexQ, 'texte-court')">
+									<span class="coche" />
+								</label>
+							</div>
+							<draggable class="items" v-model="q.items" draggable=".item" handle=".poignee" filter=".desactive" :animation="150" :scroll="true" :force-fallback="true" v-if="q.option !== 'texte-court'">
+								<div :id="'item' + indexQ + '_' + index" class="item" v-for="(item, index) in q.items" :key="'item_' + index">
+									<span class="poignee" :class="{'desactive': chargement.substring(0, 5) === 'image' || q.items.length === 1}">
+										<i class="material-icons">drag_indicator</i>
+									</span>
+									<span class="reponse">
+										<i class="material-icons" v-if="!item.reponse && q.option === 'choix-unique'" @click="selectionnerReponse(indexQ, index)">radio_button_unchecked</i>
+										<i class="material-icons" v-else-if="item.reponse && q.option === 'choix-unique'" @click="selectionnerReponse(indexQ, index)">radio_button_checked</i>
+										<i class="material-icons" v-else-if="!item.reponse && q.option === 'choix-multiples'" @click="selectionnerReponse(indexQ, index)">check_box_outline_blank</i>
+										<i class="material-icons" v-else-if="item.reponse && q.option === 'choix-multiples'" @click="selectionnerReponse(indexQ, index)">check_box</i>
+									</span>
+									<div class="conteneur-textarea" :class="{'image': item.image !== ''}">
+										<TextareaAutosize v-model="item.texte" :rows="1" :min-height="46" :max-height="94" :item-id="'_' + indexQ + '_' + index" :placeholder="$t('choix') + ' ' + (index + 1)" />
 									</div>
-									<span class="actions" v-if="chargement === 'support' + indexQ">
+									<span class="actions" v-if="chargement === 'image' + indexQ + '_' + index">
 										<span class="conteneur-chargement">
 											<span class="chargement" />
 											<span class="progression">{{ progression }} %</span>
 										</span>
+										<span @click="supprimerItem(indexQ, index)" :class="{'desactive': q.items.length === 1}" :title="$t('supprimerReponse')"><i class="material-icons">delete</i></span>
 									</span>
-									<span class="actions" v-else-if="chargement !== 'support' + indexQ && Object.keys(q.support).length === 0">
-										<label :for="'televerser-support' + indexQ" role="button" tabindex="0" :title="$t('ajouterImage')"><i class="material-icons">add_photo_alternate</i></label>
-										<input :id="'televerser-support' + indexQ" type="file" @change="televerserImage(indexQ, 'support', 'Questionnaire')" style="display: none" accept=".jpg, .jpeg, .png, .gif">
+									<span class="actions" role="button" tabindex="0" :title="$t('ajouterImage')" v-else-if="chargement !== 'image' + indexQ + '_' + index && item.image === ''">
+										<label :for="'televerser-image' + indexQ + '_' + index"><i class="material-icons">add_photo_alternate</i></label>
+										<input :id="'televerser-image' + indexQ + '_' + index" type="file" @change="televerserImage(indexQ, index, 'Questionnaire')" style="display: none" accept=".jpg, .jpeg, .png, .gif">
+										<span @click="supprimerItem(indexQ, index)" :class="{'desactive': q.items.length === 1}" :title="$t('supprimerReponse')"><i class="material-icons">delete</i></span>
 									</span>
-									<span class="actions image" v-else-if="chargement !== 'support' + indexQ && Object.keys(q.support).length > 0" @click="afficherSupport(indexQ, '/fichiers/' + code + '/' + q.support.image)" :title="$t('afficherImage')" :style="{'background-image': 'url(/fichiers/' + code + '/' + q.support.image + ')'}" />
+									<span class="actions" v-else-if="chargement !== 'image' + indexQ + '_' + index && item.image !== ''">
+										<span class="image" @click="afficherImage(indexQ, '/fichiers/' + code + '/' + item.image, index)" :title="$t('afficherImage')" :style="{'background-image': 'url(/fichiers/' + code + '/' + item.image + ')'}" />
+										<span @click="supprimerItem(indexQ, index)" :class="{'desactive': q.items.length === 1}" :title="$t('supprimerReponse')"><i class="material-icons">delete</i></span>
+									</span>
 								</div>
+							</draggable>
+							<div class="reponses conteneur-textarea" v-else>
+								<TextareaAutosize v-model="q.reponses" :rows="1" :min-height="46" :max-height="94" :placeholder="$t('reponsesAcceptees')" />
 							</div>
 
-							<div :id="'items' + indexQ" class="section" :key="'items_' + indexQ">
-								<h2>{{ $t('reponses') }}</h2>
-								<div class="options">
-									<label class="bouton-radio">{{ $t('choixUnique') }}
-										<input type="radio" :name="'option' + indexQ" :checked="q.option === 'choix-unique'" @change="modifierOption(indexQ, 'choix-unique')">
-										<span class="coche" />
-									</label>
-									<label class="bouton-radio">{{ $t('choixMultiples') }}
-										<input type="radio" :name="'option' + indexQ" :checked="q.option === 'choix-multiples'" @change="modifierOption(indexQ, 'choix-multiples')">
-										<span class="coche" />
-									</label>
+							<span :id="'ajouter' + indexQ" class="ajouter" role="button" tabindex="0" :title="$t('ajouterReponse')" @click="ajouterItem(indexQ, 'Questionnaire')" v-if="q.items.length < 26 && q.option !== 'texte-court'"><i class="material-icons">add_circle_outline</i></span>
+						</div>
+
+						<div :id="'points' + indexQ" class="section" v-if="options.pointsPersonnalises === true">
+							<h2>{{ $t('points') }}</h2>
+							<input class="points" type="number" :value="q.points" @input="q.points = parseInt($event.target.value)">
+						</div>
+
+						<div :id="'retroaction' + indexQ" class="section" v-if="options.retroaction === true" :key="'retroaction_' + indexQ">
+							<h2>{{ $t('retroaction') }}</h2>
+							<div class="retroaction">
+								<label>{{ $t('retroactionCorrecte') }}</label>
+								<div class="conteneur-textarea">
+									<TextareaAutosize v-model="q.retroaction.correcte" :rows="1" :min-height="46" :max-height="94" :placeholder="$t('retroactionCorrecte')" />
 								</div>
-								<draggable class="items" v-model="q.items" draggable=".item" handle=".poignee" filter=".desactive" :animation="150" :scroll="true" :force-fallback="true">
-									<div :id="'item' + indexQ + '_' + index" class="item" v-for="(item, index) in q.items" :key="'item_' + index">
-										<span class="poignee" :class="{'desactive': chargement.substring(0, 5) === 'image' || q.items.length === 1}">
-											<i class="material-icons">drag_indicator</i>
-										</span>
-										<span class="reponse">
-											<i class="material-icons" v-if="!item.reponse && q.option === 'choix-unique'" @click="selectionnerReponse(indexQ, index)">radio_button_unchecked</i>
-											<i class="material-icons" v-else-if="item.reponse && q.option === 'choix-unique'" @click="selectionnerReponse(indexQ, index)">radio_button_checked</i>
-											<i class="material-icons" v-else-if="!item.reponse && q.option === 'choix-multiples'" @click="selectionnerReponse(indexQ, index)">check_box_outline_blank</i>
-											<i class="material-icons" v-else-if="item.reponse && q.option === 'choix-multiples'" @click="selectionnerReponse(indexQ, index)">check_box</i>
-										</span>
-										<div class="conteneur-textarea" :class="{'image': item.image !== ''}">
-											<textarea-autosize v-model="q.items[index].texte" :rows="1" :min-height="46" :max-height="94" :placeholder="'Choix ' + (index + 1)" />
-										</div>
-										<span class="actions" v-if="chargement === 'image' + indexQ + '_' + index">
-											<span class="conteneur-chargement">
-												<span class="chargement" />
-												<span class="progression">{{ progression }} %</span>
-											</span>
-											<span @click="supprimerItem(indexQ, index)" :class="{'desactive': q.items.length === 1}" :title="$t('supprimerReponse')"><i class="material-icons">delete</i></span>
-										</span>
-										<span class="actions" role="button" tabindex="0" :title="$t('ajouterImage')" v-else-if="chargement !== 'image' + indexQ + '_' + index && item.image === ''">
-											<label :for="'televerser-image' + indexQ + '_' + index"><i class="material-icons">add_photo_alternate</i></label>
-											<input :id="'televerser-image' + indexQ + '_' + index" type="file" @change="televerserImage(indexQ, index, 'Questionnaire')" style="display: none" accept=".jpg, .jpeg, .png, .gif">
-											<span @click="supprimerItem(indexQ, index)" :class="{'desactive': q.items.length === 1}" :title="$t('supprimerReponse')"><i class="material-icons">delete</i></span>
-										</span>
-										<span class="actions" v-else-if="chargement !== 'image' + indexQ + '_' + index && item.image !== ''">
-											<span class="image" @click="afficherImage(indexQ, '/fichiers/' + code + '/' + item.image, index)" :title="$t('afficherImage')" :style="{'background-image': 'url(/fichiers/' + code + '/' + item.image + ')'}" />
-											<span @click="supprimerItem(indexQ, index)" :class="{'desactive': q.items.length === 1}" :title="$t('supprimerReponse')"><i class="material-icons">delete</i></span>
-										</span>
-									</div>
-								</draggable>
-
-								<span :id="'ajouter' + indexQ" class="ajouter" role="button" tabindex="0" :title="$t('ajouterReponse')" @click="ajouterItem(indexQ, 'Questionnaire')" v-if="q.items.length < 26"><i class="material-icons">add_circle_outline</i></span>
-
-								<span class="bouton supprimer" role="button" tabindex="0" @click="supprimerQuestion(indexQ)" v-if="questions.length > 1">{{ $t('supprimer') }}</span>
-								<span class="bouton dupliquer" role="button" tabindex="0" @click="dupliquerQuestion(indexQ)">{{ $t('dupliquer') }}</span>
+								<label>{{ $t('retroactionIncorrecte') }}</label>
+								<div class="conteneur-textarea">
+									<TextareaAutosize v-model="q.retroaction.incorrecte" :rows="1" :min-height="46" :max-height="94" :placeholder="$t('retroactionIncorrecte')" />
+								</div>
 							</div>
+						</div>
+
+						<div :id="'actions' + indexQ" class="section" :key="'actions_' + indexQ">
+							<span class="bouton supprimer" role="button" tabindex="0" @click="supprimerQuestion(indexQ)" v-if="questions.length > 1">{{ $t('supprimer') }}</span>
+							<span class="bouton dupliquer" role="button" tabindex="0" @click="dupliquerQuestion(indexQ)">{{ $t('dupliquer') }}</span>
 						</div>
 					</div>
 				</div>
-			</template>
+			</div>
 		</draggable>
 
 		<div class="section">
 			<span id="ajouter-question" class="bouton" role="button" tabindex="0" @click="ajouterQuestion('Questionnaire')">{{ $t('ajouterQuestion') }}</span>
 		</div>
 
-		<div class="conteneur-modale" v-if="modale === 'ajouter-media'">
-			<div id="modale-ajouter-media" class="modale">
+		<div class="conteneur-modale" role="dialog" tabindex="-1" v-if="modale === 'ajouter-media'">
+			<div id="modale-ajouter-media" class="modale" role="document">
 				<header>
 					<span class="titre">{{ $t('ajouterMedia') }}</span>
 					<span class="fermer" role="button" tabindex="0" @click="fermerModaleAjouterMedia"><i class="material-icons">close</i></span>
@@ -205,7 +258,7 @@
 					<div class="contenu" v-if="chargement === ''">
 						<label>{{ $t('lienVideo') }}</label>
 						<div class="valider">
-							<input type="text" :value="lien" @input="lien = $event.target.value" @keydown.enter="ajouterVideo">
+							<input type="text" v-model="lien" @keydown.enter="ajouterVideo">
 							<span role="button" tabindex="0" :title="$t('valider')" class="bouton-secondaire" @click="ajouterVideo"><i class="material-icons">search</i></span>
 						</div>
 						<div class="separateur"><span>{{ $t('ou') }}</span></div>
@@ -222,8 +275,8 @@
 			</div>
 		</div>
 
-		<div class="conteneur-modale" v-else-if="modale === 'media'">
-			<div id="modale-media" class="modale">
+		<div class="conteneur-modale" role="dialog" tabindex="-1" v-else-if="modale === 'media'">
+			<div id="modale-media" class="modale" role="document">
 				<header>
 					<span class="titre" />
 					<span class="fermer" role="button" tabindex="0" @click="fermerModaleMedia"><i class="material-icons">close</i></span>
@@ -244,8 +297,8 @@
 			</div>
 		</div>
 
-		<div class="conteneur-modale" v-else-if="modale === 'support'">
-			<div id="modale-image" class="modale">
+		<div class="conteneur-modale" role="dialog" tabindex="-1" v-else-if="modale === 'support'">
+			<div id="modale-image" class="modale" role="document">
 				<header>
 					<span class="titre" />
 					<span class="fermer" role="button" tabindex="0" @click="fermerModaleImage"><i class="material-icons">close</i></span>
@@ -263,8 +316,8 @@
 			</div>
 		</div>
 
-		<div class="conteneur-modale" v-else-if="modale === 'image'">
-			<div id="modale-image" class="modale">
+		<div class="conteneur-modale" role="dialog" tabindex="-1" v-else-if="modale === 'image'">
+			<div id="modale-image" class="modale" role="document">
 				<header>
 					<span class="titre" />
 					<span class="fermer" role="button" tabindex="0" @click="fermerModaleImage"><i class="material-icons">close</i></span>
@@ -285,16 +338,19 @@
 </template>
 
 <script>
-import draggable from 'vuedraggable'
-import methodesMultiCreer from '@/assets/js/methodes-multi-creer'
+import methodes from '#root/components/js/methodes-multi-creer'
+import TextareaAutosize from '#root/components/textareaAutosize.vue'
+import { VueDraggableNext } from 'vue-draggable-next'
 
 export default {
 	name: 'QuestionnaireCreer',
 	components: {
-		draggable
+		TextareaAutosize,
+		draggable: VueDraggableNext
 	},
-	extends: methodesMultiCreer,
+	extends: methodes,
 	props: {
+		hote: String,
 		code: String,
 		donnees: Object,
 		statut: String,
@@ -308,8 +364,11 @@ export default {
 				progression: 'libre',
 				nom: 'facultatif',
 				reponses: true,
+				pointsPersonnalises: false,
+				retroaction: false,
 				classement: false,
 				points: 'classique',
+				multiplicateur: 10,
 				modalite: 'synchrone'
 			},
 			questions: [
@@ -317,7 +376,10 @@ export default {
 					question: '',
 					support: {},
 					option: 'choix-unique',
-					items: [{ texte: '', image: '', alt: '', reponse: false }, { texte: '', image: '', alt: '', reponse: false }]
+					items: [{ texte: '', image: '', alt: '', reponse: false }, { texte: '', image: '', alt: '', reponse: false }],
+					reponses: '',
+					retroaction: { correcte: '', incorrecte: '' },
+					points: 1000
 				}
 			],
 			accordeonOuvert: 0,
@@ -334,11 +396,6 @@ export default {
 			medias: []
 		}
 	},
-	computed: {
-		hote () {
-			return this.$store.state.hote
-		}
-	},
 	created () {
 		if (Object.keys(this.donnees).length > 0) {
 			this.description = this.donnees.description
@@ -348,6 +405,26 @@ export default {
 			if (!this.options.hasOwnProperty('points')) {
 				this.options.points = 'classique'
 			}
+			if (!this.options.hasOwnProperty('pointsPersonnalises')) {
+				this.options.pointsPersonnalises = false
+			}
+			if (!this.options.hasOwnProperty('multiplicateur')) {
+				this.options.multiplicateur = 10
+			}
+			if (!this.options.hasOwnProperty('retroaction')) {
+				this.options.retroaction = false
+			}
+			this.questions.forEach(function (question, index) {
+				if (!question.hasOwnProperty('reponses')) {
+					this.questions[index].reponses = ''
+				}
+				if (!question.hasOwnProperty('retroaction')) {
+					this.questions[index].retroaction = { correcte: '', incorrecte: '' }
+				}
+				if (!question.hasOwnProperty('points')) {
+					this.questions[index].points = 1000
+				}
+			}.bind(this))
 		}
 	},
 	mounted () {
@@ -360,9 +437,6 @@ export default {
 		}.bind(this))
 		window.addEventListener('beforeunload', this.quitterPage, false)
 	},
-	beforeDestroy () {
-		window.removeEventListener('beforeunload', this.quitterPage, false)
-	},
 	methods: {
 		modifierParametres (type, valeur) {
 			this.options[type] = valeur
@@ -373,11 +447,15 @@ export default {
 				this.options.points = 'classique'
 			}
 		},
-		modifierOption (indexQuestion, option) {
+		modifierOption (event, indexQuestion, option) {
 			this.questions[indexQuestion].option = option
 			if (option === 'choix-unique') {
 				this.questions[indexQuestion].items.forEach(function (item) {
 					item.reponse = false
+				})
+			} else if (option === 'texte-court') {
+				this.$nextTick(function () {
+					event.target.checked = true
 				})
 			}
 		},
@@ -395,4 +473,4 @@ export default {
 }
 </script>
 
-<style scoped src="@/assets/css/styles-multi-creer.css"></style>
+<style scoped src="#root/components/css/style-multi-creer.css"></style>

@@ -4,7 +4,7 @@
 			<h2>{{ $t('question') }}</h2>
 			<div class="question">
 				<div class="conteneur-textarea" :class="{'media': Object.keys(support).length > 0}">
-					<textarea-autosize v-model="question" :rows="1" :min-height="46" :max-height="94" :placeholder="$t('question')" />
+					<TextareaAutosize v-model="question" :rows="1" :min-height="46" :max-height="94" :placeholder="$t('question')" />
 				</div>
 				<span class="actions" v-if="chargement === 'support'">
 					<span class="conteneur-chargement">
@@ -32,7 +32,7 @@
 						<i class="material-icons">drag_indicator</i>
 					</span>
 					<div class="conteneur-textarea" :class="{'image': categorie.image !== ''}">
-						<textarea-autosize v-model="categories[index].texte" :rows="1" :min-height="46" :max-height="94" :placeholder="$t('categorie') + ' ' + (index + 1)" />
+						<TextareaAutosize v-model="categories[index].texte" :rows="1" :min-height="46" :max-height="94" :placeholder="$t('categorie') + ' ' + (index + 1)" />
 					</div>
 					<span class="actions" v-if="chargement === 'image' + index">
 						<span class="conteneur-chargement">
@@ -56,8 +56,8 @@
 			<span id="ajouter" role="button" tabindex="0" :title="$t('ajouterCategorie')" @click="ajouterCategorie" v-if="categories.length < 8"><i class="material-icons">add_circle_outline</i></span>
 		</div>
 
-		<div class="conteneur-modale" v-if="modale === 'ajouter-media'">
-			<div id="modale-ajouter-media" class="modale">
+		<div class="conteneur-modale" role="dialog" tabindex="-1" v-if="modale === 'ajouter-media'">
+			<div id="modale-ajouter-media" class="modale" role="document">
 				<header>
 					<span class="titre">{{ $t('ajouterMedia') }}</span>
 					<span class="fermer" role="button" tabindex="0" @click="fermerModaleAjouterMedia"><i class="material-icons">close</i></span>
@@ -66,7 +66,7 @@
 					<div class="contenu" v-if="chargement !== 'support'">
 						<label>{{ $t('lienVideo') }}</label>
 						<div class="valider">
-							<input type="text" :value="lien" @input="lien = $event.target.value" @keydown.enter="ajouterVideo">
+							<input type="text" v-model="lien" @keydown.enter="ajouterVideo">
 							<span role="button" tabindex="0" :title="$t('valider')" class="bouton-secondaire" @click="ajouterVideo"><i class="material-icons">search</i></span>
 						</div>
 						<div class="separateur"><span>{{ $t('ou') }}</span></div>
@@ -83,8 +83,8 @@
 			</div>
 		</div>
 
-		<div class="conteneur-modale" v-else-if="modale === 'media'">
-			<div id="modale-media" class="modale">
+		<div class="conteneur-modale" role="dialog" tabindex="-1" v-else-if="modale === 'media'">
+			<div id="modale-media" class="modale" role="document">
 				<header>
 					<span class="titre" />
 					<span class="fermer" role="button" tabindex="0" @click="fermerModaleMedia"><i class="material-icons">close</i></span>
@@ -105,8 +105,8 @@
 			</div>
 		</div>
 
-		<div class="conteneur-modale" v-else-if="modale === 'image'">
-			<div id="modale-image" class="modale">
+		<div class="conteneur-modale" role="dialog" tabindex="-1" v-else-if="modale === 'image'">
+			<div id="modale-image" class="modale" role="document">
 				<header>
 					<span class="titre" />
 					<span class="fermer" role="button" tabindex="0" @click="fermerModaleImage"><i class="material-icons">close</i></span>
@@ -128,16 +128,19 @@
 
 <script>
 import axios from 'axios'
-import draggable from 'vuedraggable'
-import methodesMonoCreer from '@/assets/js/methodes-mono-creer'
+import methodes from '#root/components/js/methodes-creer'
+import TextareaAutosize from '#root/components/textareaAutosize.vue'
+import { VueDraggableNext } from 'vue-draggable-next'
 
 export default {
 	name: 'RemueMeningesCreer',
 	components: {
-		draggable
+		TextareaAutosize,
+		draggable: VueDraggableNext
 	},
-	extends: methodesMonoCreer,
+	extends: methodes,
 	props: {
+		hote: String,
 		code: String,
 		donnees: Object,
 		statut: String,
@@ -158,11 +161,6 @@ export default {
 			images: [],
 			corbeille: [],
 			progression: 0
-		}
-	},
-	computed: {
-		hote () {
-			return this.$store.state.hote
 		}
 	},
 	watch: {
@@ -203,9 +201,6 @@ export default {
 			}
 		}.bind(this))
 		window.addEventListener('beforeunload', this.quitterPage, false)
-	},
-	beforeDestroy () {
-		window.removeEventListener('beforeunload', this.quitterPage, false)
 	},
 	methods: {
 		ajouterCategorie () {
@@ -248,9 +243,9 @@ export default {
 					this.chargement = ''
 					const donnees = reponse.data
 					if (donnees === 'erreur') {
-						this.$store.dispatch('modifierMessage', this.$t('erreurCommunicationServeur'))
+						this.message = this.$t('erreurCommunicationServeur')
 					} else if (donnees === 'non_autorise') {
-						this.$store.dispatch('modifierMessage', this.$t('pasAutoriseModifierRemueMeninges'))
+						this.message = this.$t('pasAutoriseModifierRemueMeninges')
 					} else {
 						this.categories[index].image = donnees.image
 						this.categories[index].alt = donnees.alt
@@ -262,13 +257,13 @@ export default {
 					champ.value = ''
 					this.chargement = ''
 					this.progression = 0
-					this.$store.dispatch('modifierMessage', this.$t('erreurCommunicationServeur'))
+					this.message = this.$t('erreurCommunicationServeur')
 				}.bind(this))
 			} else {
 				if (!formats.includes(extension)) {
-					this.$store.dispatch('modifierMessage', this.$t('formatImageNonAccepte'))
+					this.message = this.$t('formatImageNonAccepte')
 				} else if (champ.files[0].size >= 5242880) {
-					this.$store.dispatch('modifierMessage', this.$t('tailleMaximaleImage'))
+					this.message = this.$t('tailleMaximaleImage')
 				}
 				champ.value = ''
 			}
@@ -311,7 +306,7 @@ export default {
 }
 </script>
 
-<style scoped src="@/assets/css/styles-mono-creer.css"></style>
+<style scoped src="#root/components/css/style-creer.css"></style>
 
 <style scoped>
 .categorie .conteneur-textarea.image textarea{

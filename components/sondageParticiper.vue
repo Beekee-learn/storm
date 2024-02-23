@@ -11,13 +11,13 @@
 		</div>
 
 		<div id="support" v-if="indexQuestion > -1 && Object.keys(support).length > 0">
-			<span class="bouton" role="button" tabindex="0" @click="afficherMedia">{{ $t('afficherSupport') }}</span>
+			<span class="bouton" role="button" tabindex="0" @click="afficherSupport">{{ $t('afficherSupport') }}</span>
 		</div>
 
 		<div id="description" v-if="description !== '' || Object.keys(support).length > 0" v-show="indexQuestion === -1">
 			<div class="description" v-if="description !== ''" v-html="description" />
 			<div class="support" v-if="Object.keys(support).length > 0">
-				<img v-if="support.type === 'image'" :src="'/fichiers/' + code + '/' + support.fichier" :alt="support.alt" @click="afficherImage($event, '/fichiers/' + code + '/' + support.fichier)">
+				<img v-if="support.type === 'image'" :src="'/fichiers/' + code + '/' + support.fichier" :alt="support.alt" @click="afficherImage('/fichiers/' + code + '/' + support.fichier)">
 				<audio v-else-if="support.type === 'audio'" controls :src="'/fichiers/' + code + '/' + support.fichier" />
 				<div class="video" v-else-if="support.type === 'video'">
 					<iframe :src="support.lien" allowfullscreen />
@@ -26,7 +26,7 @@
 		</div>
 
 		<div id="questions" :class="{'avec-progression': indexQuestion > -1 && questions.length > 1}">
-			<transition-group name="fondu">
+			<TransitionGroup name="fondu">
 				<div class="q" v-for="(q, indexQ) in questions" v-show="indexQuestion === indexQ" :key="'q_' + indexQ">
 					<div :id="'question' + indexQ">
 						<div class="question-et-support" v-if="q.question !== '' && Object.keys(q.support).length > 0">
@@ -39,7 +39,7 @@
 						</div>
 					</div>
 
-					<div :id="'items' + indexQ" class="items">
+					<div :id="'items' + indexQ" class="items" v-if="q.option !== 'texte-court'">
 						<template v-for="(item, index) in q.items">
 							<label :id="'item' + indexQ + '_' + index" class="item" :class="{'desactive': reponseEnvoyee[indexQ] === 'reponse-envoyee', 'correct': options.reponses === true && item.reponse === true && reponseEnvoyee[indexQ] === 'reponse-envoyee'}" v-if="item.texte !== '' || item.image !== ''" :key="'item_' + indexQ + '_' + index">
 								<span class="icone material-icons" v-if="q.option === 'choix-unique' && !reponse[indexQ].includes(item.texte) && !reponse[indexQ].includes(item.image)">radio_button_unchecked</span>
@@ -64,6 +64,9 @@
 							</label>
 						</template>
 					</div>
+					<div :id="'reponses' + indexQ" class="conteneur-textarea" v-else>
+						<TextareaAutosize :rows="2" :min-height="46" :max-height="124" :placeholder="$t('votreReponse')" @input="definirReponse($event, indexQ)" :disabled="reponseEnvoyee[indexQ] === 'reponse-envoyee'" v-if="indexQuestion === indexQ" />
+					</div>
 
 					<div class="actions" v-if="options.progression === 'libre'">
 						<span class="bouton bouton-reponse" :class="{'desactive': reponse[indexQ].length === 0}" role="button" tabindex="0" @click="envoyerReponse(indexQ)" v-if="reponseEnvoyee[indexQ] !== 'reponse-envoyee'">{{ $t('envoyer') }}</span>
@@ -71,48 +74,25 @@
 						<span class="bouton" role="button" tabindex="0" @click="modifierIndexQuestion" v-if="reponseEnvoyee[indexQ] === 'reponse-envoyee' && reponse[indexQ + 1] && reponse[indexQ + 1].length === 0">{{ $t('questionSuivante') }}</span>
 					</div>
 				</div>
-			</transition-group>
-		</div>
-
-		<div class="conteneur-modale" v-if="modale === 'image'">
-			<div id="modale-image" class="modale">
-				<div class="conteneur">
-					<div class="contenu">
-						<img :src="image" :alt="$t('image')">
-						<div class="actions">
-							<span class="bouton" role="button" tabindex="0" @click="fermerModaleImage">{{ $t('fermer') }}</span>
-						</div>
-					</div>
-				</div>
-			</div>
-		</div>
-
-		<div class="conteneur-modale" v-else-if="modale === 'media'">
-			<div id="modale-media" class="modale">
-				<div class="conteneur">
-					<div class="contenu">
-						<img v-if="support.type === 'image'" :src="'/fichiers/' + code + '/' + support.fichier" :alt="$t('image')">
-						<audio v-else-if="support.type === 'audio'" controls :src="'/fichiers/' + code + '/' + support.fichier" />
-						<div class="video" v-else-if="support.type === 'video'">
-							<iframe :src="support.lien" allowfullscreen />
-						</div>
-						<div class="actions">
-							<span class="bouton" role="button" tabindex="0" @click="fermerModale">{{ $t('fermer') }}</span>
-						</div>
-					</div>
-				</div>
-			</div>
+			</TransitionGroup>
 		</div>
 	</div>
 </template>
 
 <script>
-import methodesMultiParticiper from '@/assets/js/methodes-multi-participer'
+import TextareaAutosize from '#root/components/textareaAutosize.vue'
+import methodes from '#root/components/js/methodes-multi-participer'
 
 export default {
 	name: 'SondageParticiper',
-	extends: methodesMultiParticiper,
+	components: {
+		TextareaAutosize
+	},
+	extends: methodes,
 	props: {
+		hote: String,
+		identifiant: String,
+		nom: String,
 		code: String,
 		donnees: Object,
 		reponses: Array,
@@ -128,20 +108,7 @@ export default {
 			support: {},
 			options: {},
 			questions: [],
-			reponse: [],
-			modale: '',
-			image: ''
-		}
-	},
-	computed: {
-		hote () {
-			return this.$store.state.hote
-		},
-		identifiant () {
-			return this.$store.state.identifiant
-		},
-		nom () {
-			return this.$store.state.nom
+			reponse: []
 		}
 	},
 	watch: {
@@ -150,6 +117,13 @@ export default {
 				if (valeur === 'validation') {
 					this.$emit('validation', { reponse: this.reponse, identifiant: this.identifiant, nom: this.nom })
 				}
+			}
+		},
+		indexQuestion: function (indexQuestion) {
+			if (this.questions[indexQuestion].option === 'texte-court' && this.reponseEnvoyee[indexQuestion] === 'reponse-envoyee') {
+				setTimeout(function () {
+					document.querySelector('#reponses' + indexQuestion + ' textarea').value = this.reponse[indexQuestion].toString()
+				}.bind(this), 0)
 			}
 		}
 	},
@@ -169,6 +143,15 @@ export default {
 			}.bind(this))
 		}
 	},
+	mounted () {
+		this.$nextTick(function () {
+			if (this.questions[this.indexQuestion] && this.questions[this.indexQuestion].hasOwnProperty('option') && this.questions[this.indexQuestion].option === 'texte-court' && this.reponseEnvoyee[this.indexQuestion] === 'reponse-envoyee') {
+				this.$nextTick(function () {
+					document.querySelector('#reponses' + this.indexQuestion + ' textarea').value = this.reponse[this.indexQuestion].toString()
+				}.bind(this))
+			}
+		}.bind(this))
+	},
 	methods: {
 		envoyerReponse (indexQuestion) {
 			if (this.reponse[indexQuestion].length > 0 && this.reponseEnvoyee[indexQuestion] !== 'reponse-envoyee') {
@@ -179,4 +162,4 @@ export default {
 }
 </script>
 
-<style scoped src="@/assets/css/styles-multi-participer.css"></style>
+<style scoped src="#root/components/css/style-multi-participer.css"></style>

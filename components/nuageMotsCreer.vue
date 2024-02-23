@@ -21,7 +21,7 @@
 			<h2>{{ $t('question') }}</h2>
 			<div class="question">
 				<div class="conteneur-textarea" :class="{'media': Object.keys(support).length > 0}">
-					<textarea-autosize v-model="question" :rows="1" :min-height="46" :max-height="94" :placeholder="$t('question')" />
+					<TextareaAutosize v-model="question" :rows="1" :min-height="46" :max-height="94" :placeholder="$t('question')" />
 				</div>
 				<span class="actions" v-if="chargement === 'support'">
 					<span class="conteneur-chargement">
@@ -40,8 +40,8 @@
 			</div>
 		</div>
 
-		<div class="conteneur-modale" v-if="modale === 'ajouter-media'">
-			<div id="modale-ajouter-media" class="modale">
+		<div class="conteneur-modale" role="dialog" tabindex="-1" v-if="modale === 'ajouter-media'">
+			<div id="modale-ajouter-media" class="modale" role="document">
 				<header>
 					<span class="titre">{{ $t('ajouterMedia') }}</span>
 					<span class="fermer" role="button" tabindex="0" @click="fermerModaleAjouterMedia"><i class="material-icons">close</i></span>
@@ -50,7 +50,7 @@
 					<div class="contenu" v-if="chargement !== 'support'">
 						<label>{{ $t('lienVideo') }}</label>
 						<div class="valider">
-							<input type="text" :value="lien" @input="lien = $event.target.value" @keydown.enter="ajouterVideo">
+							<input type="text" v-model="lien" @keydown.enter="ajouterVideo">
 							<span role="button" tabindex="0" :title="$t('valider')" class="bouton-secondaire" @click="ajouterVideo"><i class="material-icons">search</i></span>
 						</div>
 						<div class="separateur"><span>{{ $t('ou') }}</span></div>
@@ -67,8 +67,8 @@
 			</div>
 		</div>
 
-		<div class="conteneur-modale" v-else-if="modale === 'media'">
-			<div id="modale-media" class="modale">
+		<div class="conteneur-modale" role="dialog" tabindex="-1" v-else-if="modale === 'media'">
+			<div id="modale-media" class="modale" role="document">
 				<header>
 					<span class="titre" />
 					<span class="fermer" role="button" tabindex="0" @click="fermerModaleMedia"><i class="material-icons">close</i></span>
@@ -93,12 +93,17 @@
 
 <script>
 import axios from 'axios'
-import methodesMonoCreer from '@/assets/js/methodes-mono-creer'
+import methodes from '#root/components/js/methodes-creer'
+import TextareaAutosize from '#root/components/textareaAutosize.vue'
 
 export default {
 	name: 'NuageMotsCreer',
-	extends: methodesMonoCreer,
+	components: {
+		TextareaAutosize
+	},
+	extends: methodes,
 	props: {
+		hote: String,
 		code: String,
 		donnees: Object,
 		statut: String,
@@ -118,11 +123,6 @@ export default {
 			medias: [],
 			corbeille: [],
 			progression: 0
-		}
-	},
-	computed: {
-		hote () {
-			return this.$store.state.hote
 		}
 	},
 	watch: {
@@ -156,9 +156,6 @@ export default {
 		}.bind(this))
 		window.addEventListener('beforeunload', this.quitterPage, false)
 	},
-	beforeDestroy () {
-		window.removeEventListener('beforeunload', this.quitterPage, false)
-	},
 	methods: {
 		modifierParametres (type, valeur) {
 			this.options[type] = valeur
@@ -184,4 +181,4 @@ export default {
 }
 </script>
 
-<style scoped src="@/assets/css/styles-mono-creer.css"></style>
+<style scoped src="#root/components/css/style-creer.css"></style>

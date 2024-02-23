@@ -20,7 +20,7 @@
 
 		<div id="mot">
 			<div class="conteneur-textarea">
-				<textarea-autosize v-model="texte" :rows="2" :min-height="46" :max-height="124" :placeholder="$t('votreMot')" />
+				<TextareaAutosize v-model="texte" :rows="2" :min-height="46" :max-height="124" :placeholder="$t('votreMot')" />
 			</div>
 			<div class="actions">
 				<span class="bouton" role="button" tabindex="0" @click="envoyerReponse" v-if="statut !== 'verrouille'">{{ $t('envoyer') }}</span>
@@ -39,29 +39,12 @@
 			</ul>
 		</div>
 
-		<div class="conteneur-modale" v-if="modale === 'media'">
-			<div id="modale-media" class="modale">
-				<div class="conteneur">
-					<div class="contenu">
-						<img v-if="media.type === 'image'" :src="media.fichier" :alt="$t('image')">
-						<audio v-else-if="media.type === 'audio'" controls :src="media.fichier" />
-						<div class="video" v-else-if="media.type === 'video'">
-							<iframe :src="media.lien" allowfullscreen />
-						</div>
-						<div class="actions">
-							<span class="bouton" role="button" tabindex="0" @click="fermerModaleMedia">{{ $t('fermer') }}</span>
-						</div>
-					</div>
-				</div>
-			</div>
-		</div>
-
-		<div class="conteneur-modale" v-else-if="modale === 'nuage'">
-			<div id="modale-nuage" class="modale">
+		<div class="conteneur-modale" role="dialog" tabindex="-1" v-if="modale === 'nuage'">
+			<div id="modale-nuage" class="modale" role="document">
 				<div class="conteneur">
 					<div class="contenu">
 						<vue-word-cloud :animation-duration="350" animation-easing="ease-in-out" :animation-overlap="1" color="#00ced1" font-family="HKGrotesk-ExtraBold" :spacing="1/2" :words="nuage" @update:progress="modifierProgression">
-							<template slot-scope="{text, weight}">
+							<template v-slot="{text, weight}">
 								<div :title="text + ' (' + weight + ')'">
 									{{ text }}
 								</div>
@@ -72,40 +55,32 @@
 			</div>
 		</div>
 
-		<chargement :chargement="chargement" v-if="chargement" />
+		<Chargement v-if="chargement" />
 	</div>
 </template>
 
 <script>
 import latinise from 'voca/latinise'
-import chargement from '@/components/chargement.vue'
+import Chargement from '#root/components/chargement.vue'
+import TextareaAutosize from '#root/components/textareaAutosize.vue'
+import VueWordCloud from '#root/components/wordcloud'
 
 export default {
 	name: 'NuageMotsParticiper',
 	components: {
-		chargement
+		Chargement,
+		TextareaAutosize,
+		[VueWordCloud.name]: VueWordCloud
 	},
 	props: {
+		hote: String,
+		identifiant: String,
+		nom: String,
 		code: String,
 		donnees: Object,
 		reponses: Array,
 		statut: String,
 		session: Number
-	},
-	sockets: {
-		reponseenvoyee: function () {
-			this.texte = ''
-		},
-		nuageaffiche: function () {
-			this.definirNuage()
-			this.modale = 'nuage'
-		},
-		nuagemasque: function () {
-			this.nuage = []
-			if (this.modale === 'nuage') {
-				this.modale = ''
-			}
-		}
 	},
 	data () {
 		return {
@@ -116,20 +91,10 @@ export default {
 			texte: '',
 			nuage: [],
 			modale: '',
-			media: {},
 			progression: ''
 		}
 	},
 	computed: {
-		hote () {
-			return this.$store.state.hote
-		},
-		identifiant () {
-			return this.$store.state.identifiant
-		},
-		nom () {
-			return this.$store.state.nom
-		},
 		mots () {
 			const mots = []
 			this.reponses.forEach(function (item) {
@@ -142,9 +107,9 @@ export default {
 	},
 	watch: {
 		reponses: {
-			handler () {
+			handler (reponses) {
 				if (this.statut === 'nuage-affiche') {
-					this.definirNuage()
+					this.definirNuage(reponses)
 				}
 			},
 			deep: true
@@ -163,13 +128,14 @@ export default {
 		}
 	},
 	created () {
+		this.ecouterSocket()
 		this.question = this.donnees.question
 		this.support = this.donnees.support
 		if (this.donnees.hasOwnProperty('options')) {
 			this.options = this.donnees.options
 		}
 		if (this.statut === 'nuage-affiche') {
-			this.definirNuage()
+			this.definirNuage(this.reponses)
 		}
 	},
 	mounted () {
@@ -178,9 +144,9 @@ export default {
 		}
 	},
 	methods: {
-		definirNuage () {
+		definirNuage (reponses) {
 			const nuage = []
-			this.reponses.forEach(function (item) {
+			reponses.forEach(function (item) {
 				if (item.reponse.visible && (Object.keys(this.options).length === 0 || (this.options.hasOwnProperty('casse') && this.options.casse === 'non'))) {
 					if (nuage.map(mot => mot.text).includes(item.reponse.texte) === true) {
 						nuage.forEach(function (mot, indexMot) {
@@ -212,31 +178,39 @@ export default {
 		},
 		envoyerReponse () {
 			if (this.texte.trim() !== '') {
+				this.chargement = true
 				const couleurs = ['#ffd077', '#3bc4c7', '#3a9eea', '#ff4e69', '#461e47']
 				const couleur = couleurs[Math.floor(Math.random() * couleurs.length)]
-				this.$emit('validation', { reponse: { texte: this.texte.trim(), couleur: couleur, visible: true }, identifiant: this.identifiant, nom: this.nom })
+				this.$socket.emit('reponse', { code: this.code, session: this.session, donnees: { reponse: { texte: this.texte.trim(), couleur: couleur, visible: true }, identifiant: this.identifiant, nom: this.nom } })
 				this.texte = ''
 			}
 		},
 		afficherMedia (event, media, type) {
-			event.preventDefault()
-			event.stopPropagation()
-			if (type === 'video') {
-				this.media = { lien: media, type: type }
-			} else {
-				this.media = { fichier: media, type: type }
-			}
-			this.modale = 'media'
+			this.$emit('media', event, media, type)
 		},
-		fermerModaleMedia () {
-			this.modale = ''
-			this.media = {}
+		ecouterSocket () {
+			this.$socket.on('reponseenvoyee', function () {
+				this.chargement = false
+				this.texte = ''
+			}.bind(this))
+
+			this.$socket.on('nuageaffiche', function () {
+				this.definirNuage(this.reponses)
+				this.modale = 'nuage'
+			}.bind(this))
+
+			this.$socket.on('nuagemasque', function () {
+				this.nuage = []
+				if (this.modale === 'nuage') {
+					this.modale = ''
+				}
+			}.bind(this))
 		}
 	}
 }
 </script>
 
-<style scoped src="@/assets/css/styles-mono-participer.css"></style>
+<style scoped src="#root/components/css/style-participer.css"></style>
 
 <style scoped>
 #mot .conteneur-textarea {

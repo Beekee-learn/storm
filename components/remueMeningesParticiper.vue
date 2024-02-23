@@ -20,23 +20,23 @@
 
 		<div id="message">
 			<div class="conteneur-textarea">
-				<textarea-autosize v-model="texte" :rows="2" :min-height="46" :max-height="124" :placeholder="$t('votreMessage')" />
+				<TextareaAutosize v-model="texte" :rows="2" :min-height="46" :max-height="124" :placeholder="$t('votreMessage')" />
 			</div>
 			<div id="categories" v-if="categories.length > 0">
 				<h3>{{ $t('categorie') }}</h3>
 				<div id="conteneur-categories" v-if="categories.length > 0">
 					<template v-for="(cat, indexCat) in categories">
-						<label class="bouton-radio avec-image" v-if="cat.texte !== '' && cat.image !== ''" :key="'categorie_' + indexCat"><span class="image"><img :src="'/fichiers/' + code + '/' + cat.image" :alt="cat.alt" :style="{'border': '2px solid' + couleurs[indexCat]}" @click="afficherImage($event, '/fichiers/' + code + '/' + cat.image)" :title="$t('afficherImage')"></span><span class="texte" :style="{'color': couleurs[indexCat]}">{{ cat.texte }}</span>
+						<label class="bouton-radio avec-image" v-if="cat.texte !== '' && cat.image !== ''" :key="'categorie_texte_image_' + indexCat"><span class="image"><img :src="'/fichiers/' + code + '/' + cat.image" :alt="cat.alt" :style="{'border': '2px solid' + couleurs[indexCat]}" @click="afficherImage($event, '/fichiers/' + code + '/' + cat.image)" :title="$t('afficherImage')"></span><span class="texte" :style="{'color': couleurs[indexCat]}">{{ cat.texte }}</span>
 							<input type="radio" name="categorie" :checked="categorie === cat.texte" @change="categorie = cat.texte">
 							<span class="coche" />
 						</label>
 
-						<label class="bouton-radio" v-else-if="cat.texte !== ''" :style="{'color': couleurs[indexCat]}" :key="'categorie_' + indexCat">{{ cat.texte }}
+						<label class="bouton-radio" v-else-if="cat.texte !== ''" :style="{'color': couleurs[indexCat]}" :key="'categorie_texte_' + indexCat">{{ cat.texte }}
 							<input type="radio" name="categorie" :checked="categorie === cat.texte" @change="categorie = cat.texte">
 							<span class="coche" />
 						</label>
 
-						<label class="bouton-radio avec-image" v-else-if="cat.image !== ''" :key="'categorie_' + indexCat"><span class="image"><img :src="'/fichiers/' + code + '/' + cat.image" :alt="cat.alt" :style="{'border': '2px solid' + couleurs[indexCat]}" @click="afficherImage($event, '/fichiers/' + code + '/' + cat.image)" :title="$t('afficherImage')"></span>
+						<label class="bouton-radio avec-image" v-else-if="cat.image !== ''" :key="'categorie_image_' + indexCat"><span class="image"><img :src="'/fichiers/' + code + '/' + cat.image" :alt="cat.alt" :style="{'border': '2px solid' + couleurs[indexCat]}" @click="afficherImage($event, '/fichiers/' + code + '/' + cat.image)" :title="$t('afficherImage')"></span>
 							<input type="radio" name="categorie" :checked="categorie === cat.image" @change="categorie = cat.image">
 							<span class="coche" />
 						</label>
@@ -65,53 +65,26 @@
 				</li>
 			</ul>
 		</div>
-
-		<div class="conteneur-modale" v-if="modale === 'media'">
-			<div id="modale-media" class="modale">
-				<div class="conteneur">
-					<div class="contenu">
-						<img v-if="media.type === 'image'" :src="media.fichier" :alt="$t('image')">
-						<audio v-else-if="media.type === 'audio'" controls :src="media.fichier" />
-						<div class="video" v-else-if="media.type === 'video'">
-							<iframe :src="media.lien" allowfullscreen />
-						</div>
-						<div class="actions">
-							<span class="bouton" role="button" tabindex="0" @click="fermerModaleMedia">{{ $t('fermer') }}</span>
-						</div>
-					</div>
-				</div>
-			</div>
-		</div>
-
-		<div class="conteneur-modale" v-else-if="modale === 'image'">
-			<div id="modale-image" class="modale">
-				<div class="conteneur">
-					<div class="contenu">
-						<img :src="image" :alt="$t('image')">
-						<div class="actions">
-							<span class="bouton" role="button" tabindex="0" @click="fermerModaleImage">{{ $t('fermer') }}</span>
-						</div>
-					</div>
-				</div>
-			</div>
-		</div>
 	</div>
 </template>
 
 <script>
+import TextareaAutosize from '#root/components/textareaAutosize.vue'
+
 export default {
 	name: 'RemueMeningesParticiper',
+	components: {
+		TextareaAutosize
+	},
 	props: {
+		hote: String,
+		identifiant: String,
+		nom: String,
 		code: String,
 		donnees: Object,
 		reponses: Array,
 		statut: String,
 		session: Number
-	},
-	sockets: {
-		reponseenvoyee: function () {
-			this.texte = ''
-		}
 	},
 	data () {
 		return {
@@ -120,22 +93,10 @@ export default {
 			categories: [],
 			couleurs: ['#27ae60', '#2980b9', '#8e44ad', '#f39c12', '#d35400', '#b71540', '#535c68', '#273c75'],
 			categorie: '',
-			texte: '',
-			modale: '',
-			media: {},
-			image: ''
+			texte: ''
 		}
 	},
 	computed: {
-		hote () {
-			return this.$store.state.hote
-		},
-		identifiant () {
-			return this.$store.state.identifiant
-		},
-		nom () {
-			return this.$store.state.nom
-		},
 		messages () {
 			const messages = []
 			this.reponses.forEach(function (item) {
@@ -147,6 +108,7 @@ export default {
 		}
 	},
 	created () {
+		this.ecouterSocket()
 		this.question = this.donnees.question
 		if (this.donnees.support.hasOwnProperty('image')) {
 			this.support = { fichier: this.donnees.support.image, alt: this.donnees.support.alt, type: 'image' }
@@ -165,8 +127,9 @@ export default {
 	methods: {
 		envoyerReponse () {
 			if (this.texte.trim() !== '') {
+				this.chargement = true
 				const id = Date.now().toString(36) + Math.random().toString(36).substr(2)
-				this.$emit('validation', { reponse: { id: id, texte: this.texte.trim(), categorie: this.categorie, visible: true }, identifiant: this.identifiant, nom: this.nom })
+				this.$socket.emit('reponse', { code: this.code, session: this.session, donnees: { reponse: { id: id, texte: this.texte.trim(), categorie: this.categorie, visible: true }, identifiant: this.identifiant, nom: this.nom } })
 				this.texte = ''
 			}
 		},
@@ -180,53 +143,42 @@ export default {
 			return couleur
 		},
 		afficherMedia (event, media, type) {
-			event.preventDefault()
-			event.stopPropagation()
-			if (type === 'video') {
-				this.media = { lien: media, type: type }
-			} else {
-				this.media = { fichier: media, type: type }
-			}
-			this.modale = 'media'
-		},
-		fermerModaleMedia () {
-			this.modale = ''
-			this.media = {}
+			this.$emit('media', event, media, type)
 		},
 		afficherImage (event, image) {
-			event.preventDefault()
-			event.stopPropagation()
-			this.image = image
-			this.modale = 'image'
-		},
-		fermerModaleImage () {
-			this.modale = ''
-			this.image = ''
+			this.$emit('image', event, image)
 		},
 		eclaircirCouleur (hex) {
 			const r = parseInt(hex.slice(1, 3), 16)
 			const v = parseInt(hex.slice(3, 5), 16)
 			const b = parseInt(hex.slice(5, 7), 16)
 			return 'rgba(' + r + ', ' + v + ', ' + b + ', ' + 0.1 + ')'
+		},
+		ecouterSocket () {
+			this.$socket.on('reponseenvoyee', function () {
+				this.chargement = false
+				this.texte = ''
+			}.bind(this))
 		}
 	}
 }
 </script>
 
-<style scoped src="@/assets/css/styles-mono-participer.css"></style>
+<style scoped src="#root/components/css/style-participer.css"></style>
 
 <style scoped>
 #message .conteneur-textarea {
     position: relative;
     min-height: 46px;
     max-height: 124px;
+	margin-bottom: 40px;
 }
 
 #message .conteneur-textarea > textarea {
 	display: block;
     width: 100%;
     font-weight: 400;
-    font-size: 16px;
+    font-size: 2rem;
     text-align: left;
     border-radius: 4px;
     cursor: text;
@@ -252,6 +204,7 @@ export default {
 #message #conteneur-categories {
 	display: inline-flex;
 	justify-content: flex-start;
+	align-items: center;
 }
 
 #message .bouton-radio.avec-image {
@@ -327,7 +280,7 @@ export default {
 
 #messages {
 	margin-top: 40px;
-	margin-bottom: 30px;
+	margin-bottom: 40px;
 }
 
 #messages ul {

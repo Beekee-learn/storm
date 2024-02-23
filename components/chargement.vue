@@ -1,6 +1,6 @@
 <template>
-	<transition name="fondu">
-		<div id="conteneur-chargement" v-if="chargement">
+	<Transition name="fondu">
+		<div id="conteneur-chargement">
 			<div id="chargement">
 				<div class="spinner">
 					<div />
@@ -18,15 +18,12 @@
 				</div>
 			</div>
 		</div>
-	</transition>
+	</Transition>
 </template>
 
 <script>
 export default {
-	name: 'Chargement',
-	props: {
-		chargement: Boolean
-	}
+	name: 'Chargement'
 }
 </script>
 
