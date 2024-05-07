@@ -163,7 +163,7 @@ async function demarrerServeur () {
 		if (req.session.identifiant && req.session.role === 'utilisateur') {
 			res.redirect('/u/' + req.session.identifiant)
 		} else {
-			let langue = 'fr'
+			let langue = 'en'
 			if (req.session.hasOwnProperty('langue') && req.session.langue !== '') {
 				langue = req.session.langue
 			}
@@ -228,7 +228,7 @@ async function demarrerServeur () {
 			req.session.identifiant = identifiant
 			req.session.nom = ''
 			req.session.email = ''
-			req.session.langue = 'fr'
+			req.session.langue = 'en'
 			req.session.role = 'invite'
 			req.session.interactions = []
 			req.session.digidrive = []
@@ -274,7 +274,7 @@ async function demarrerServeur () {
 			req.session.identifiant = identifiant
 			req.session.nom = ''
 			req.session.email = ''
-			req.session.langue = 'fr'
+			req.session.langue = 'en'
 			req.session.role = 'invite'
 			req.session.interactions = []
 			req.session.digidrive = []
@@ -311,7 +311,7 @@ async function demarrerServeur () {
 	})
 
 	app.get('/admin', async function (req, res, next) {
-		let langue = 'fr'
+		let langue = 'en'
 		if (req.session.hasOwnProperty('langue') && req.session.langue !== '') {
 			langue = req.session.langue
 		}
@@ -339,7 +339,7 @@ async function demarrerServeur () {
 		const identifiant = req.body.identifiant
 		const motdepasse = req.body.motdepasse
 		const email = req.body.email
-		let langue = 'fr'
+		let langue = 'en'
 		if (req.session && req.session.hasOwnProperty('langue') && req.session.langue !== '') {
 			langue = req.session.langue
 		}
@@ -355,7 +355,7 @@ async function demarrerServeur () {
 					req.session.nom = ''
 					req.session.email = email
 					if (req.session.langue === '' || req.session.langue === undefined) {
-						req.session.langue = 'fr'
+						req.session.langue = 'en'
 					}
 					req.session.role = 'utilisateur'
 					req.session.cookie.expires = new Date(Date.now() + dureeSession)
@@ -711,7 +711,7 @@ async function demarrerServeur () {
 					req.session.identifiant = identifiant
 					req.session.nom = ''
 					req.session.email = ''
-					req.session.langue = 'fr'
+					req.session.langue = 'en'
 					req.session.role = 'invite'
 					req.session.interactions = []
 					req.session.cookie.expires = new Date(Date.now() + dureeSession)
@@ -777,7 +777,7 @@ async function demarrerServeur () {
 						req.session.nom = ''
 						req.session.email = ''
 						if (req.session.langue === '' || req.session.langue === undefined) {
-							req.session.langue = 'fr'
+							req.session.langue = 'en'
 						}
 						req.session.role = 'auteur'
 						req.session.interactions.push({ code: code, motdepasse: motdepasse })
@@ -1021,7 +1021,7 @@ async function demarrerServeur () {
 						req.session.nom = ''
 						req.session.email = ''
 						if (req.session.langue === '' || req.session.langue === undefined) {
-							req.session.langue = 'fr'
+							req.session.langue = 'en'
 						}
 						req.session.role = 'auteur'
 						req.session.cookie.expires = new Date(Date.now() + dureeSession)
@@ -1079,7 +1079,7 @@ async function demarrerServeur () {
 						req.session.nom = ''
 						req.session.email = ''
 						if (req.session.langue === '' || req.session.langue === undefined) {
-							req.session.langue = 'fr'
+							req.session.langue = 'en'
 						}
 						req.session.role = 'auteur'
 						req.session.cookie.expires = new Date(Date.now() + dureeSession)
