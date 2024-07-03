@@ -5,7 +5,7 @@
 				<path fill="#007BFF" d="M17.8,10l0,5.6c0,0.1,0,0.2,0,0.3v0.6c0,0.8-0.6,1.4-1.4,1.4h-0.6c0,0-0.1,0-0.1,0c0,0-0.1,0-0.1,0h-2 c-0.8,0-1.4-0.6-1.4-1.4v-3.1c0-0.6-0.5-1.1-1.1-1.1H8.9c-0.6,0-1.1,0.5-1.1,1.1v3.1c0,0.8-0.6,1.4-1.4,1.4H4.4c-0.1,0-0.1,0-0.2,0 c0,0-0.1,0-0.1,0H3.6c-0.8,0-1.4-0.6-1.4-1.4v-3.9c0,0,0-0.1,0-0.1V10H1.1C0.5,10,0,9.5,0,8.9C0,8.6,0.1,8.3,0.3,8l8.9-7.8 C9.5,0,9.8,0,10,0s0.5,0.1,0.7,0.2l3.7,3.3V2.2c0-0.6,0.5-1.1,1.1-1.1h1.1c0.6,0,1.1,0.5,1.1,1.1v4.2L19.6,8C19.9,8.3,20,8.6,20,8.9 c0,0.6-0.5,1.1-1.1,1.1H17.8z"/>
 			</svg>
 		</a>
-		<div id="accueil" :style="{'background-image': 'url(./img/orange1.jpg)'}">
+		<div id="accueil" :style="{'background': '#eaad13'}">
 			<div id="langues">
 				<span class="bouton" role="button" tabindex="0" :class="{'selectionne': langue === 'fr'}" @click="modifierLangue('fr')">FR</span>
 				<span class="bouton" role="button" tabindex="0" :class="{'selectionne': langue === 'es'}" @click="modifierLangue('es')">ES</span>
@@ -30,7 +30,6 @@
 				<div id="credits">
 					<p><a href="https://opencollective.com/ladigitale" target="_blank">{{ $t('soutien') }} ❤️.</a></p>
 					<p>{{ new Date().getFullYear() }} - <a href="https://ladigitale.dev" target="_blank" rel="noreferrer">La Digitale</a> - <a href="https://codeberg.org/ladigitale/digistorm" target="_blank" rel="noreferrer">{{ $t('codeSource') }}</a></p>
-					<p><a href="https://www.freepik.com/free-vector/watercolor-amber-background_39272723.htm#fromView=search&page=1&position=1&uuid=20a3a06b-2eba-4cb2-99fb-d48781d901c5">Image by freepik</a></p>
 				</div>
 			</div>
 		</div>
